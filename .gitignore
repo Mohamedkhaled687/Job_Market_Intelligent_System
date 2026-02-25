@@ -1,0 +1,40 @@
+### Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyd
+*.pdb
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+### Environment / secrets
+.env
+
+### Node / frontend (Vite React app)
+src/views/frontend/node_modules/
+src/views/frontend/dist/
+npm-debug.log*
+
+### Editor / IDE
+.vscode/
+.idea/
+.DS_Store
+
+### Cursor / tooling
+.cursor/
+
+### Scrapling / crawl artifacts (if used)
+crawl_data/
+scrapling_logs/
+
