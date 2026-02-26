@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from src.models.enums import SeniorityLevel, JobCategory
 
-
+# Base model for a job
 class JobBase(BaseModel):
     source: str = "wuzzuf"
     source_url: str
@@ -19,10 +19,12 @@ class JobBase(BaseModel):
     posted_date: Optional[datetime] = None
 
 
+# Model for creating a job
 class JobCreate(JobBase):
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# Model for enriching a job
 class JobEnrichment(BaseModel):
     normalized_skills: list[str] = Field(default_factory=list)
     seniority: Optional[SeniorityLevel] = None
@@ -31,6 +33,7 @@ class JobEnrichment(BaseModel):
     enriched_at: Optional[datetime] = None
 
 
+# Model for a job in the database
 class JobInDB(JobBase):
     id: str = Field(alias="_id")
     scraped_at: datetime
@@ -43,6 +46,7 @@ class JobInDB(JobBase):
     model_config = {"populate_by_name": True}
 
 
+# Model for a job response
 class JobResponse(BaseModel):
     id: str
     source: str
@@ -63,6 +67,7 @@ class JobResponse(BaseModel):
     enriched_at: Optional[datetime]
 
 
+# Model for a paginated jobs response
 class PaginatedJobsResponse(BaseModel):
     jobs: list[JobResponse]
     page: int
