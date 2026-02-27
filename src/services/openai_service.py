@@ -1,8 +1,8 @@
 import json
-import os
 from typing import Optional
 
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types as genai_types
 
 from src.utils.config import get_settings
 
@@ -34,20 +34,23 @@ Job Description:
 
 async def extract_job_insights(description: str, title: str = "") -> Optional[dict]:
     settings = get_settings()
-    if not settings.openai_api_key or settings.openai_api_key == "sk-your-key-here":
+    if not settings.google_api_key:
         return _fallback_extraction(description, title)
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = genai.Client(api_key=settings.google_api_key)
     prompt = SKILL_EXTRACTION_PROMPT.replace("{description}", f"{title}\n{description}")
 
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=500,
-        )
-        content = response.choices[0].message.content.strip()
+        async with client.aio as aclient:
+            response = await aclient.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=500,
+                ),
+            )
+        content = response.text.strip()
         if content.startswith("```"):
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
         return json.loads(content)
@@ -56,7 +59,7 @@ async def extract_job_insights(description: str, title: str = "") -> Optional[di
 
 
 def _fallback_extraction(description: str, title: str = "") -> dict:
-    """Rule-based fallback when OpenAI is unavailable."""
+    """Rule-based fallback when the API is unavailable."""
     text = f"{title} {description}".lower()
 
     skill_keywords = {
