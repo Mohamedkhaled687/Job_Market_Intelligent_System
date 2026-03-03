@@ -39,3 +39,14 @@ async def scrape_status(task_id: str):
     if not status:
         raise HTTPException(status_code=404, detail="Task not found")
     return {"task_id": task_id, **status}
+
+
+@router.post("/clear")
+async def clear_data(confirm: bool = False):
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Pass ?confirm=true to confirm clearing all jobs and crawl logs.",
+        )
+    result = await scraper_controller.clear_jobs_and_logs()
+    return {"status": "cleared", **result}

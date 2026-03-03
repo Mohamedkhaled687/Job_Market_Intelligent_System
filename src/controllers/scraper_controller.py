@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from src.models.database import get_db
 from src.models.schemas import CrawlLogCreate
 from src.services.wuzzuf_scraper import scrape_wuzzuf_sync
-from src.services.openai_service import extract_job_insights
+from src.services.openai_service import extract_job_insights, estimate_salary
 
 _task_registry: dict[str, dict] = {}
 
@@ -95,9 +95,17 @@ async def run_scrape(
             )
             if insights:
                 doc["normalized_skills"] = insights.get("skills", [])
-                doc["seniority"] = insights.get("seniority")
-                doc["category"] = insights.get("category")
-                doc["salary_estimate"] = insights.get("salary_estimate_usd")
+                seniority = insights.get("seniority") or "mid"
+                category = insights.get("category") or "other"
+                doc["seniority"] = seniority
+                doc["category"] = category
+
+                salary = insights.get("salary_estimate_usd")
+                if not salary or salary <= 0:
+                    location_text = f"{doc.get('location', '')} {doc.get('description_text', '')}"
+                    salary = estimate_salary(seniority, category, location_text)
+                doc["salary_estimate"] = salary
+
                 doc["enriched_at"] = datetime.utcnow()
         except Exception:
             pass
@@ -144,3 +152,14 @@ def get_task_status(task_id: str) -> dict | None:
         The status of the task.
     """
     return _task_registry.get(task_id)
+
+
+async def clear_jobs_and_logs() -> dict:
+    """Drop all documents from the jobs and crawl_logs collections."""
+    db = get_db()
+    jobs_result = await db.jobs.delete_many({})
+    logs_result = await db.crawl_logs.delete_many({})
+    return {
+        "jobs_deleted": jobs_result.deleted_count,
+        "crawl_logs_deleted": logs_result.deleted_count,
+    }
