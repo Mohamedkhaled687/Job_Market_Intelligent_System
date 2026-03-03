@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     google_api_key: str = ""  # read from GOOGLE_API_KEY
     scrape_max_pages: int = 5
     scrape_delay_seconds: float = 2.0
+    scrape_detail_delay_seconds: float = 1.0
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
