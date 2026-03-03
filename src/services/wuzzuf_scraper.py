@@ -128,7 +128,7 @@ def _parse_card(link) -> JobCreate | None:
 
     texts = [
         t.strip()
-        for t in card.css("::text").getall()
+        for t in card.css("::text").get_all()
         if t.strip() and not t.strip().startswith(".css-") and len(t.strip()) > 1
     ]
     # Typical pattern: [title, "Company -", "Location, Country", "X days ago"]
