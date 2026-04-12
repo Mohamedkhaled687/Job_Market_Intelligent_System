@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     PieChart,
     Pie,
@@ -26,17 +26,31 @@ const COLORS = [
 ];
 
 export function CategoryDonut({ data }: CategoryDonutProps) {
-    const resolvedTextColor = useMemo(() => {
+    const getResolvedTextColor = useCallback(() => {
         if (typeof window === "undefined") return "currentColor";
         const root = document.documentElement;
         const raw =
             getComputedStyle(root).getPropertyValue("--card-foreground") ||
-            getComputedStyle(document.body).getPropertyValue(
-                "--card-foreground",
-            );
+            getComputedStyle(document.body).getPropertyValue("--card-foreground");
         const t = raw.trim();
         return t ? `hsl(${t})` : "currentColor";
     }, []);
+
+    const [resolvedTextColor, setResolvedTextColor] = useState(() => getResolvedTextColor());
+
+    useEffect(() => {
+        const root = document.documentElement;
+        const update = () => setResolvedTextColor(getResolvedTextColor());
+        const obs = new MutationObserver(update);
+        obs.observe(root, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+        obs.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+        window.addEventListener("storage", update); // if theme is toggled via localStorage elsewhere
+
+        return () => {
+            obs.disconnect();
+            window.removeEventListener("storage", update);
+        };
+    }, [getResolvedTextColor]);
 
     if (!data || data.length === 0) {
         return (
@@ -74,6 +88,7 @@ export function CategoryDonut({ data }: CategoryDonutProps) {
                             border: "1px solid hsl(var(--border))",
                             borderRadius: "8px",
                             fontSize: 13,
+                            color: resolvedTextColor,
                         }}
                         labelStyle={{
                             color: resolvedTextColor,
