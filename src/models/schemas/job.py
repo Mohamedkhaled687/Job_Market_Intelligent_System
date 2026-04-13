@@ -18,8 +18,8 @@ class JobBase(BaseModel):
     listed_skills: list[str] = Field(default_factory=list)
     posted_date: Optional[datetime] = None
 
-
 # Model for creating a job
+# This is the model that scraper produces 
 class JobCreate(JobBase):
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -47,6 +47,7 @@ class JobInDB(JobBase):
 
 
 # Model for a job response
+# This is the model that is returned to the client(Frontend)
 class JobResponse(BaseModel):
     id: str
     source: str

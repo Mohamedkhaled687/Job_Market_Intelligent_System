@@ -11,6 +11,20 @@ const CHART_COLORS = [
   "hsl(221, 83%, 68%)", "hsl(221, 83%, 73%)", "hsl(221, 78%, 78%)",
 ];
 
+function SkillTick({ x, y, payload }: { x: number; y: number; payload: { value: string } }) {
+  return (
+    <text
+      x={x}
+      y={y}
+      dy={4}
+      textAnchor="end"
+      style={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+    >
+      {payload.value}
+    </text>
+  );
+}
+
 export function SkillBarChart({ data }: SkillBarChartProps) {
   const chartData = data.slice(0, 12);
 
@@ -18,13 +32,18 @@ export function SkillBarChart({ data }: SkillBarChartProps) {
     <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
       <h3 className="text-base font-semibold mb-4">Top Skills by Demand</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 80, right: 20, top: 5, bottom: 5 }}>
-          <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+          <XAxis
+            type="number"
+            tick={{ fontSize: 12, fill: "currentColor" }}
+            className="text-[hsl(var(--muted-foreground))]"
+          />
           <YAxis
             type="category"
             dataKey="skill"
-            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-            width={75}
+            interval={0}
+            tick={SkillTick}
+            width={90}
           />
           <Tooltip
             contentStyle={{
