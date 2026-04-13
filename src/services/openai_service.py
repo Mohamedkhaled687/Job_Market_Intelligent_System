@@ -81,9 +81,10 @@ async def extract_job_insights(description: str, title: str = "", location: str 
         return _fallback_extraction(description, title, location)
 
     client = genai.Client(api_key=settings.google_api_key)
+    location_line = f"\nLocation: {location}" if location.strip() else ""
     prompt = SKILL_EXTRACTION_PROMPT.replace(
         "{description}",
-        f"{title}\nLocation: {location}\n{description}",
+        f"{title}{location_line}\n{description}",
     )
 
     try:
