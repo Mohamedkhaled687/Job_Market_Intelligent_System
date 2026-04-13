@@ -75,13 +75,16 @@ def estimate_salary(seniority: str, category: str, location_text: str) -> int:
     return round(base * multiplier)
 
 
-async def extract_job_insights(description: str, title: str = "") -> Optional[dict]:
+async def extract_job_insights(description: str, title: str = "", location: str = "") -> Optional[dict]:
     settings = get_settings()
     if not settings.google_api_key:
-        return _fallback_extraction(description, title)
+        return _fallback_extraction(description, title, location)
 
     client = genai.Client(api_key=settings.google_api_key)
-    prompt = SKILL_EXTRACTION_PROMPT.replace("{description}", f"{title}\n{description}")
+    prompt = SKILL_EXTRACTION_PROMPT.replace(
+        "{description}",
+        f"{title}\nLocation: {location}\n{description}",
+    )
 
     try:
         async with client.aio as aclient:
@@ -98,10 +101,10 @@ async def extract_job_insights(description: str, title: str = "") -> Optional[di
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
         return json.loads(content)
     except Exception:
-        return _fallback_extraction(description, title)
+        return _fallback_extraction(description, title, location)
 
 
-def _fallback_extraction(description: str, title: str = "") -> dict:
+def _fallback_extraction(description: str, title: str = "", location: str = "") -> dict:
     """Rule-based fallback when the API is unavailable."""
     text = f"{title} {description}".lower()
 
@@ -161,7 +164,9 @@ def _fallback_extraction(description: str, title: str = "") -> dict:
             category = cat
             break
 
-    salary = estimate_salary(seniority, category, text)
+    # Prefer explicit location while preserving text-based regional hints.
+    location_context = f"{location} {text}".strip()
+    salary = estimate_salary(seniority, category, location_context)
 
     return {
         "skills": found_skills,

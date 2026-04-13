@@ -32,11 +32,15 @@ export function SkillBarChart({ data }: SkillBarChartProps) {
     <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
       <h3 className="text-base font-semibold mb-4">Top Skills by Demand</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ left: 10, right: 20, top: 5, bottom: 5 }}
+          className="[&_.recharts-cartesian-axis-tick-value]:fill-[hsl(var(--muted-foreground))]"
+        >
           <XAxis
             type="number"
-            tick={{ fontSize: 12, fill: "currentColor" }}
-            className="text-[hsl(var(--muted-foreground))]"
+            tick={{ fontSize: 12 }}
           />
           <YAxis
             type="category"

@@ -92,6 +92,7 @@ async def run_scrape(
             insights = await extract_job_insights(
                 description=doc.get("description_text", ""),
                 title=doc.get("title", ""),
+                location=doc.get("location", ""),
             )
             if insights:
                 doc["normalized_skills"] = insights.get("skills", [])
