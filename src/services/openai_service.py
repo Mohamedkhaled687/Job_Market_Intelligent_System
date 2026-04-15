@@ -1,10 +1,19 @@
 import json
+import logging
 from typing import Optional
 
+import httpx
 from google import genai
 from google.genai import types as genai_types
 
 from src.utils.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Ollama configuration
+OLLAMA_API_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "mistral"  # Lightweight, accurate model
+OLLAMA_TIMEOUT = 60  # seconds
 
 SKILL_EXTRACTION_PROMPT = """You are an expert technical recruiter and compensation analyst. Given the following job description,
 extract a JSON object with these fields:
@@ -76,18 +85,77 @@ def estimate_salary(seniority: str, category: str, location_text: str) -> int:
 
 
 async def extract_job_insights(description: str, title: str = "", location: str = "") -> Optional[dict]:
-    settings = get_settings()
-    if not settings.google_api_key:
-        return _fallback_extraction(description, title, location)
-
-    client = genai.Client(api_key=settings.google_api_key)
+    """Extract job insights using Ollama first, then Gemini, then fallback rules."""
     location_line = f"\nLocation: {location}" if location.strip() else ""
     prompt = SKILL_EXTRACTION_PROMPT.replace(
         "{description}",
         f"{title}{location_line}\n{description}",
     )
 
+    # Try Ollama first (local, fast, private)
+    result = await _extract_with_ollama(prompt)
+    if result:
+        logger.info("✓ Job insights extracted via Ollama")
+        return result
+
+    # Fallback to Gemini API
+    settings = get_settings()
+    if settings.google_api_key:
+        result = await _extract_with_gemini(prompt, settings.google_api_key)
+        if result:
+            logger.info("✓ Job insights extracted via Gemini")
+            return result
+
+    # Final fallback to rule-based extraction
+    logger.info("✓ Job insights extracted via fallback rules")
+    return _fallback_extraction(description, title, location)
+
+
+async def _extract_with_ollama(prompt: str) -> Optional[dict]:
+    """Extract using local Ollama instance."""
     try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            response = await client.post(
+                OLLAMA_API_URL,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 500,
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data.get("response", "").strip()
+            
+            if not content:
+                return None
+            
+            # Extract JSON from response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            
+            result = json.loads(content)
+            return result
+    except httpx.ConnectError:
+        logger.debug("Ollama not available, trying next method...")
+        return None
+    except (json.JSONDecodeError, KeyError, IndexError) as e:
+        logger.warning(f"Ollama returned invalid JSON: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Ollama error: {e}")
+        return None
+
+
+async def _extract_with_gemini(prompt: str, api_key: str) -> Optional[dict]:
+    """Extract using Google Gemini API."""
+    try:
+        client = genai.Client(api_key=api_key)
         async with client.aio as aclient:
             response = await aclient.models.generate_content(
                 model="gemini-2.5-flash",
@@ -101,8 +169,9 @@ async def extract_job_insights(description: str, title: str = "", location: str 
         if content.startswith("```"):
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
         return json.loads(content)
-    except Exception:
-        return _fallback_extraction(description, title, location)
+    except Exception as e:
+        logger.warning(f"Gemini error: {e}")
+        return None
 
 
 def _fallback_extraction(description: str, title: str = "", location: str = "") -> dict:
