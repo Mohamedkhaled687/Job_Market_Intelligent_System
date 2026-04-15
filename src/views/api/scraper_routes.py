@@ -11,6 +11,7 @@ router = APIRouter(prefix="/scrape", tags=["Scraper"])
 class ScrapeRequest(BaseModel):
     keywords: Optional[list[str]] = None
     max_pages: Optional[int] = None
+    provider: Optional[str] = "wuzzuf"
 
 
 class ScrapeResponse(BaseModel):
@@ -23,12 +24,14 @@ async def trigger_scrape(request: ScrapeRequest, background_tasks: BackgroundTas
     task_id = await scraper_controller.enqueue_scrape(
         keywords=request.keywords,
         max_pages=request.max_pages,
+        provider=request.provider,
     )
     background_tasks.add_task(
         scraper_controller.run_scrape,
         task_id,
         request.keywords,
         request.max_pages,
+        request.provider,
     )
     return ScrapeResponse(task_id=task_id, status="running")
 

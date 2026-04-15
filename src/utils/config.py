@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     mongodb_db_name: str = "job_board_intelligence"
     openai_api_key: str = ""  # kept for backward compatibility
     google_api_key: str = ""  # read from GOOGLE_API_KEY
+    linkedin_rapidapi_key: str = ""  # read from LINKEDIN_RAPIDAPI_KEY
+    linkedin_rapidapi_host: str = ""  # read from LINKEDIN_RAPIDAPI_HOST
     scrape_max_pages: int = 5
     scrape_delay_seconds: float = 2.0
     scrape_detail_delay_seconds: float = 1.0

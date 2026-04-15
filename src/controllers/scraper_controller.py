@@ -6,6 +6,7 @@ from pymongo.errors import DuplicateKeyError
 
 from src.models.database import get_db
 from src.models.schemas import CrawlLogCreate
+from src.services.linkedin_scraper import scrape_linkedin_sync
 from src.services.wuzzuf_scraper import scrape_wuzzuf_sync
 from src.services.openai_service import extract_job_insights, estimate_salary
 
@@ -15,6 +16,7 @@ _task_registry: dict[str, dict] = {}
 async def enqueue_scrape(
     keywords: list[str] | None = None,
     max_pages: int | None = None,
+    provider: str = "wuzzuf",
 ) -> str:
     """
     Enqueues a scrape task.
@@ -29,6 +31,7 @@ async def enqueue_scrape(
     task_id = str(uuid.uuid4())
     _task_registry[task_id] = {
         "status": "running",
+        "provider": provider,
         "pages_scraped": 0,
         "jobs_found": 0,
         "errors": 0,
@@ -42,6 +45,7 @@ async def run_scrape(
     task_id: str,
     keywords: list[str] | None = None,
     max_pages: int | None = None,
+    provider: str = "wuzzuf",
 ) -> None:
     """
     Runs a scrape task.
@@ -57,7 +61,8 @@ async def run_scrape(
     db = get_db()
     task = _task_registry[task_id]
 
-    log = CrawlLogCreate(source="wuzzuf", started_at=datetime.utcnow())
+    source = provider or task.get("provider", "wuzzuf")
+    log = CrawlLogCreate(source=source, started_at=datetime.utcnow())
     log_result = await db.crawl_logs.insert_one(log.model_dump())
     log_id = log_result.inserted_id
 
@@ -72,6 +77,12 @@ async def run_scrape(
         task["errors"] = errors
 
     def _collect_jobs():
+        if source == "linkedin":
+            return list(scrape_linkedin_sync(
+                keywords=keywords,
+                max_pages=max_pages,
+                on_progress=on_progress,
+            ))
         return list(scrape_wuzzuf_sync(
             keywords=keywords,
             max_pages=max_pages,
