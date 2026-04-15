@@ -261,12 +261,15 @@ def scrape_wuzzuf_sync(
 
                 yield job
                 count += 1
+                if on_progress:
+                    # Emit per-job progress so the frontend counter updates in real time.
+                    on_progress(page=page_num + 1, count=1)
             except Exception:
                 logger.warning("Error processing card", exc_info=True)
                 continue
 
         if on_progress:
-            on_progress(page=page_num + 1, count=count)
+            on_progress(page=page_num + 1, count=0)
 
         if page_num < max_pages - 1:
             time.sleep(delay)

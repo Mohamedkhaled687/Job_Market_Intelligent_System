@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,6 +13,13 @@ from src.views.api.scraper_routes import router as scraper_router
 from src.views.api.jobs_routes import router as jobs_router
 from src.views.api.insights_routes import router as insights_router
 from src.views.api.studyplan_routes import router as studyplan_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(name)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 FRONTEND_DIR = Path(__file__).parent / "src" / "views" / "frontend" / "dist"
 
@@ -58,3 +66,13 @@ if FRONTEND_DIR.exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(FRONTEND_DIR / "index.html"))
+else:
+
+    @app.get("/", tags=["Health"])
+    async def root():
+        return {
+            "status": "ok",
+            "message": "API is running",
+            "health": "/health",
+            "docs": "/docs",
+        }

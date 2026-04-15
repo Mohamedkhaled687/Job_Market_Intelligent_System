@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+import logging
 from datetime import datetime
 
 from pymongo.errors import DuplicateKeyError
@@ -8,6 +9,8 @@ from src.models.database import get_db
 from src.models.schemas import CrawlLogCreate
 from src.services.wuzzuf_scraper import scrape_wuzzuf_sync
 from src.services.openai_service import extract_job_insights, estimate_salary
+
+logger = logging.getLogger(__name__)
 
 _task_registry: dict[str, dict] = {}
 
@@ -69,6 +72,9 @@ async def run_scrape(
         if error:
             errors += 1
         task["pages_scraped"] = page
+        if count:
+            # Surface live progress to the UI while background enrichment/inserts continue.
+            task["jobs_found"] = task.get("jobs_found", 0) + count
         task["errors"] = errors
 
     def _collect_jobs():
@@ -80,7 +86,9 @@ async def run_scrape(
 
     try:
         scraped_jobs = await asyncio.to_thread(_collect_jobs)
-    except Exception:
+        logger.info(f"Collected {len(scraped_jobs)} jobs from scraper")
+    except Exception as e:
+        logger.error(f"Error collecting jobs: {e}", exc_info=True)
         errors += 1
         task["errors"] = errors
         scraped_jobs = []
@@ -108,16 +116,18 @@ async def run_scrape(
                 doc["salary_estimate"] = salary
 
                 doc["enriched_at"] = datetime.utcnow()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error enriching job {doc.get('url', 'unknown')}: {e}")
 
         try:
-            await db.jobs.insert_one(doc)
+            result = await db.jobs.insert_one(doc)
             jobs_inserted += 1
+            logger.info(f"✓ Inserted job {result.inserted_id}: {doc.get('title', 'unknown')}")
             task["jobs_found"] = jobs_inserted
         except DuplicateKeyError:
-            pass
-        except Exception:
+            logger.info(f"- Job already exists (duplicate): {doc.get('url', 'unknown')}")
+        except Exception as e:
+            logger.error(f"✗ Error inserting job {doc.get('url', 'unknown')}: {e}", exc_info=True)
             errors += 1
             task["errors"] = errors
 
