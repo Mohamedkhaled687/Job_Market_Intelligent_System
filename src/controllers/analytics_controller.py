@@ -1,6 +1,7 @@
 from typing import Optional
 
 from src.models.database import get_db
+from src.services.analytics_service import AnalyticsService
 
 
 async def get_dashboard(
@@ -147,3 +148,81 @@ async def get_skill_graph(min_weight: int = 3) -> dict:
     ]
 
     return {"nodes": nodes, "edges": edges}
+
+
+# --- Advanced Analytics using Pandas & NumPy ---
+
+async def get_market_overview() -> dict:
+    """Get comprehensive market overview with statistical analysis."""
+    analytics = AnalyticsService()
+    return await analytics.get_market_overview()
+
+
+async def get_advanced_salary_analysis(
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+) -> dict:
+    """Get detailed salary analysis with statistical metrics."""
+    analytics = AnalyticsService()
+    base_stats = await analytics.get_salary_statistics(category=category, seniority=seniority)
+    by_seniority = await analytics.get_salary_by_seniority()
+    by_category = await analytics.get_salary_by_category()
+
+    return {
+        "overall_stats": base_stats,
+        "by_seniority": by_seniority,
+        "by_category": by_category,
+    }
+
+
+async def get_skill_demand_metrics(top_n: int = 25) -> dict:
+    """Get detailed skill demand analysis."""
+    analytics = AnalyticsService()
+    demand = await analytics.get_skill_demand_analysis(top_n=top_n)
+    salary_correlation = await analytics.get_skill_salary_correlation(top_skills=15)
+
+    return {
+        "top_skills": demand,
+        "skill_salary_correlation": salary_correlation,
+    }
+
+
+async def get_posting_trends_analysis(days: int = 90) -> dict:
+    """Get job posting trends analysis."""
+    analytics = AnalyticsService()
+    trends = await analytics.get_job_posting_trends(days=days)
+    market_overview = await analytics.get_market_overview()
+
+    return {
+        "daily_trends": trends,
+        "total_jobs": market_overview.get("total_jobs"),
+        "analysis_period_days": days,
+    }
+
+
+async def get_company_analytics(top_n: int = 20) -> dict:
+    """Get company hiring patterns and compensation analysis."""
+    analytics = AnalyticsService()
+    return {
+        "top_companies": await analytics.get_company_insights(top_n=top_n),
+    }
+
+
+async def get_full_analytics_dashboard() -> dict:
+    """Get comprehensive analytics dashboard combining all insights."""
+    analytics = AnalyticsService()
+
+    return {
+        "market_overview": await analytics.get_market_overview(),
+        "salary_analysis": {
+            "overall": await analytics.get_salary_statistics(),
+            "by_seniority": await analytics.get_salary_by_seniority(),
+            "by_category": await analytics.get_salary_by_category(),
+        },
+        "skill_analysis": {
+            "top_skills": await analytics.get_skill_demand_analysis(top_n=25),
+            "salary_correlation": await analytics.get_skill_salary_correlation(top_skills=15),
+        },
+        "company_analysis": await analytics.get_company_insights(top_n=20),
+        "posting_trends": await analytics.get_job_posting_trends(days=90),
+    }
