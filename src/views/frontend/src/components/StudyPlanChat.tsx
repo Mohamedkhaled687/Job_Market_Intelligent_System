@@ -69,7 +69,10 @@ export function StudyPlanChat() {
       onSuccess: (data) => {
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: data.content },
+          {
+            role: "assistant",
+            content: data.content + (data.source ? `\n\n---\n_Source: ${data.source}_` : ""),
+          },
         ]);
       },
       onError: () => {
@@ -78,7 +81,7 @@ export function StudyPlanChat() {
           {
             role: "assistant",
             content:
-              "**Something went wrong.** Please check that the API server is running and try again.",
+              "**Something went wrong.** The backend request failed. Please try again after checking the API server.",
           },
         ]);
       },

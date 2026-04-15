@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     role: str
     content: str
+    source: str
 
 
 @router.post("/chat", response_model=ChatResponse)

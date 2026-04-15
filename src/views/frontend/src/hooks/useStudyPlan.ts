@@ -6,9 +6,11 @@ interface ChatMessage {
   content: string;
 }
 
-interface ChatResponse {
+
+export interface ChatResponse {
   role: string;
   content: string;
+  source: string;
 }
 
 export type { ChatMessage };
