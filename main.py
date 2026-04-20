@@ -1,25 +1,43 @@
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from src.models.database import connect_db, close_db
+from src.models.database import connect_db, close_db, get_db
 from src.views.api.scraper_routes import router as scraper_router
 from src.views.api.jobs_routes import router as jobs_router
 from src.views.api.insights_routes import router as insights_router
 from src.views.api.studyplan_routes import router as studyplan_router
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from src.services.curriculum_fetcher import CurriculumFetcher
 
 FRONTEND_DIR = Path(__file__).parent / "src" / "views" / "frontend" / "dist"
 
+scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    db = get_db()
+    
+    # Schedule the sync to run at midnight every Sunday (00:00)
+    @scheduler.scheduled_job('cron', day_of_week='sun', hour=0, minute=0)
+    async def run_sync():
+        print("Starting scheduled YouTube curriculum sync...")
+        fetcher = CurriculumFetcher(db)
+        await fetcher.sync()
+        print("Scheduled sync complete.")
+        
+    scheduler.start()
+    
     yield
+    
+    scheduler.shutdown()
     await close_db()
 
 
@@ -58,3 +76,7 @@ if FRONTEND_DIR.exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+
+
+
