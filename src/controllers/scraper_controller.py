@@ -8,6 +8,7 @@ from src.models.database import get_db
 from src.models.schemas import CrawlLogCreate
 from src.services.wuzzuf_scraper import scrape_wuzzuf_sync
 from src.services.openai_service import extract_job_insights, estimate_salary
+from src.utils.config import get_settings
 
 _task_registry: dict[str, dict] = {}
 
@@ -32,6 +33,9 @@ async def enqueue_scrape(
         "pages_scraped": 0,
         "jobs_found": 0,
         "errors": 0,
+        "current_query": None,
+        "queries_completed": 0,
+        "total_queries": 0,
         "started_at": datetime.utcnow().isoformat(),
         "finished_at": None,
     }
@@ -56,20 +60,34 @@ async def run_scrape(
 
     db = get_db()
     task = _task_registry[task_id]
+    settings = get_settings()
 
     log = CrawlLogCreate(source="wuzzuf", started_at=datetime.utcnow())
     log_result = await db.crawl_logs.insert_one(log.model_dump())
     log_id = log_result.inserted_id
 
-    jobs_inserted = 0
     errors = 0
+    pages_scraped = 0
 
-    def on_progress(page: int = 0, count: int = 0, error: bool = False):
-        nonlocal errors
+    def on_progress(
+        query: str | None = None,
+        page: int = 0,
+        count: int = 0,
+        error: bool = False,
+        queries_completed: int = 0,
+        total_queries: int = 0,
+    ):
+        nonlocal errors, pages_scraped
         if error:
             errors += 1
-        task["pages_scraped"] = page
+        if page:
+            pages_scraped += 1
+        if query is not None:
+            task["current_query"] = query
+        task["pages_scraped"] = pages_scraped
         task["errors"] = errors
+        task["queries_completed"] = queries_completed
+        task["total_queries"] = total_queries
 
     def _collect_jobs():
         return list(scrape_wuzzuf_sync(
@@ -85,32 +103,42 @@ async def run_scrape(
         task["errors"] = errors
         scraped_jobs = []
 
-    for job in scraped_jobs:
-        doc = job.model_dump()
+    # Parallel AI enrichment with a bounded semaphore to respect rate limits.
+    sem = asyncio.Semaphore(max(1, settings.scrape_enrich_concurrency))
 
-        try:
-            insights = await extract_job_insights(
-                description=doc.get("description_text", ""),
-                title=doc.get("title", ""),
-                location=doc.get("location", ""),
-            )
-            if insights:
-                doc["normalized_skills"] = insights.get("skills", [])
-                seniority = insights.get("seniority") or "mid"
-                category = insights.get("category") or "other"
-                doc["seniority"] = seniority
-                doc["category"] = category
+    async def _enrich_one(doc: dict) -> dict:
+        async with sem:
+            try:
+                insights = await extract_job_insights(
+                    description=doc.get("description_text", ""),
+                    title=doc.get("title", ""),
+                    location=doc.get("location", ""),
+                )
+            except Exception:
+                insights = None
 
-                salary = insights.get("salary_estimate_usd")
-                if not salary or salary <= 0:
-                    location_text = f"{doc.get('location', '')} {doc.get('description_text', '')}"
-                    salary = estimate_salary(seniority, category, location_text)
-                doc["salary_estimate"] = salary
+        if insights:
+            doc["normalized_skills"] = insights.get("skills", [])
+            seniority = insights.get("seniority") or "mid"
+            category = insights.get("category") or "other"
+            doc["seniority"] = seniority
+            doc["category"] = category
 
-                doc["enriched_at"] = datetime.utcnow()
-        except Exception:
-            pass
+            salary = insights.get("salary_estimate_usd")
+            if not salary or salary <= 0:
+                location_text = f"{doc.get('location', '')} {doc.get('description_text', '')}"
+                salary = estimate_salary(seniority, category, location_text)
+            doc["salary_estimate"] = salary
+            doc["enriched_at"] = datetime.utcnow()
+        return doc
 
+    docs = [job.model_dump() for job in scraped_jobs]
+    enriched_docs: list[dict] = []
+    if docs:
+        enriched_docs = await asyncio.gather(*[_enrich_one(d) for d in docs])
+
+    jobs_inserted = 0
+    for doc in enriched_docs:
         try:
             await db.jobs.insert_one(doc)
             jobs_inserted += 1
@@ -124,7 +152,7 @@ async def run_scrape(
     finished = datetime.utcnow()
     task.update({
         "status": "completed",
-        "pages_scraped": task.get("pages_scraped", 0),
+        "pages_scraped": pages_scraped,
         "jobs_found": jobs_inserted,
         "errors": errors,
         "finished_at": finished.isoformat(),
@@ -133,7 +161,7 @@ async def run_scrape(
     await db.crawl_logs.update_one(
         {"_id": log_id},
         {"$set": {
-            "pages_scraped": task.get("pages_scraped", 0),
+            "pages_scraped": pages_scraped,
             "jobs_found": jobs_inserted,
             "errors": errors,
             "finished_at": finished,

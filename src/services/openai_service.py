@@ -14,7 +14,7 @@ extract a JSON object with these fields:
   "seniority": "junior|mid|senior|lead",
   "certifications": ["cert1"],
   "salary_estimate_usd": <number>,
-  "category": "backend|frontend|fullstack|data|devops|mobile|design|management|qa|other"
+  "category": "backend|frontend|fullstack|ai|data|devops|mobile|design|management|qa|other"
 }
 
 Rules:
@@ -49,7 +49,7 @@ _MARKET_RATES_USD: dict[str, dict[str, int]] = {
 }
 
 _CATEGORY_MULTIPLIER: dict[str, float] = {
-    "data": 1.20, "devops": 1.15, "fullstack": 1.10, "backend": 1.05,
+    "ai": 1.25, "data": 1.20, "devops": 1.15, "fullstack": 1.10, "backend": 1.05,
     "frontend": 1.00, "mobile": 1.05, "management": 1.15,
     "design": 0.90, "qa": 0.90, "other": 1.00,
 }
@@ -150,12 +150,15 @@ def _fallback_extraction(description: str, title: str = "", location: str = "") 
 
     category = "other"
     category_map = {
-        "backend": ["backend", "back-end", "server-side", "api developer"],
-        "frontend": ["frontend", "front-end", "ui developer", "ui engineer"],
-        "fullstack": ["fullstack", "full-stack", "full stack"],
-        "data": ["data engineer", "data scientist", "data analyst", "machine learning", "ml engineer", "ai engineer"],
+        "ai": ["ai engineer", "machine learning engineer", "ml engineer",
+               "deep learning", "nlp", "computer vision", "generative ai", "llm"],
+        "data": ["data engineer", "data scientist", "data analyst",
+                 "machine learning", "big data", "etl"],
         "devops": ["devops", "sre", "site reliability", "infrastructure", "platform engineer"],
         "mobile": ["mobile", "android", "ios", "flutter", "react native"],
+        "fullstack": ["fullstack", "full-stack", "full stack"],
+        "backend": ["backend", "back-end", "server-side", "api developer"],
+        "frontend": ["frontend", "front-end", "ui developer", "ui engineer"],
         "design": ["ui/ux", "ux designer", "ui designer", "product designer"],
         "management": ["project manager", "product manager", "engineering manager", "tech lead", "team lead"],
         "qa": ["qa", "quality assurance", "test engineer", "sdet"],
