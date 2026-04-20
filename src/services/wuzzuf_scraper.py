@@ -1,9 +1,14 @@
+import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Iterator
+from urllib.parse import quote_plus, urlparse
+
+import httpx
 
 from scrapling.fetchers import Fetcher # fetchs pages with browser-like headers
 
@@ -13,6 +18,50 @@ from src.utils.config import get_settings
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://wuzzuf.net/search/jobs/"
+
+_DEBUG_LOG_PATH = (
+    "/home/mohamed-khaled/Projects/Faculty_Projects/Job_Market_Intelligent_System/"
+    ".cursor/debug-7cf068.log"
+)
+
+
+def _agent_debug_log(
+    *,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict,
+    run_id: str = "run1",
+) -> None:
+    # region agent log
+    payload = {
+        "sessionId": "7cf068",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+        "runId": run_id,
+    }
+    try:
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # endregion
+
+# Curated role queries covering every JobCategory enum value.
+# Seniority tiers (junior/mid/senior/lead) arise naturally from each query's pages.
+DEFAULT_QUERIES: list[str] = [
+    "backend developer", "frontend developer", "full stack developer",
+    "software engineer", "mobile developer", "android developer", "ios developer",
+    "devops engineer", "sre",
+    "data engineer", "data scientist", "data analyst",
+    "ai engineer", "machine learning engineer",
+    "qa engineer", "test engineer",
+    "ui ux designer",
+    "engineering manager", "tech lead",
+]
 
 _SECTION_HEADINGS = re.compile(
     r"(job\s+description|job\s+requirements|requirements|responsibilities"
@@ -76,12 +125,60 @@ class _DetailResult:
 
 def _fetch_and_parse_detail(source_url: str) -> _DetailResult | None:
     """Fetch a single Wuzzuf job-detail page and extract structured data."""
+    settings = get_settings()
+    timeout = float(settings.scrape_detail_timeout_seconds)
+    t0 = time.monotonic()
     try:
-        page = Fetcher.get(source_url, stealthy_headers=True)
+        page = Fetcher.get(
+            source_url,
+            stealthy_headers=True,
+            timeout=timeout,
+        )
         if page.status != 200:
             logger.warning("Detail page returned %s for %s", page.status, source_url)
             return None
-    except Exception:
+    except httpx.TimeoutException as exc:
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        path = urlparse(source_url).path or ""
+        # region agent log
+        _agent_debug_log(
+            hypothesis_id="H1-read-timeout",
+            location="wuzzuf_scraper.py:_fetch_and_parse_detail",
+            message="detail fetch timed out",
+            data={
+                "exc_type": type(exc).__name__,
+                "timeout_sec": timeout,
+                "elapsed_ms": elapsed_ms,
+                "path_prefix": path[:120],
+                "is_saudi_path": "/saudi/" in path,
+            },
+            run_id="post-fix",
+        )
+        # endregion
+        logger.warning(
+            "Detail page timed out (timeout=%ss, waited ~%sms): %s",
+            timeout,
+            elapsed_ms,
+            source_url,
+        )
+        return None
+    except Exception as exc:
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        path = urlparse(source_url).path or ""
+        # region agent log
+        _agent_debug_log(
+            hypothesis_id="H2-other-fetch-error",
+            location="wuzzuf_scraper.py:_fetch_and_parse_detail",
+            message="detail fetch failed",
+            data={
+                "exc_type": type(exc).__name__,
+                "timeout_sec": timeout,
+                "elapsed_ms": elapsed_ms,
+                "path_prefix": path[:120],
+            },
+            run_id="post-fix",
+        )
+        # endregion
         logger.warning("Failed to fetch detail page %s", source_url, exc_info=True)
         return None
 
@@ -203,73 +300,124 @@ def _parse_detail_page(page) -> _DetailResult:
     )
 
 
+def _merge_detail(job: JobCreate, detail: "_DetailResult | None") -> JobCreate:
+    """Merge a `_DetailResult` into a `JobCreate` stub."""
+    if not detail:
+        return job
+    desc = detail.description_text
+    if detail.salary_raw:
+        desc = f"Salary: {detail.salary_raw}\n\n{desc}"
+    job.description_text = desc
+    job.listed_skills = detail.listed_skills
+    if detail.experience_range:
+        job.experience_range = detail.experience_range
+    if detail.job_type:
+        job.job_type = detail.job_type
+    return job
+
+
 def scrape_wuzzuf_sync(
     keywords: list[str] | None = None,
     max_pages: int | None = None,
     on_progress=None,
 ) -> Iterator[JobCreate]:
-    """Scrape Wuzzuf search pages and, for each result, deep-scrape the detail page."""
+    """Scrape Wuzzuf search pages for every query and deep-scrape each detail page.
+
+    - `keywords` is treated as a list of independent search queries. If None,
+      the curated `DEFAULT_QUERIES` (covering all `JobCategory` roles) is used.
+    - `max_pages` overrides the per-query page cap (`scrape_pages_per_query`).
+    - Detail pages are fetched concurrently via a thread pool for speed.
+    """
     settings = get_settings()
-    max_pages = max_pages or settings.scrape_max_pages
-    delay = settings.scrape_delay_seconds
-    detail_delay = settings.scrape_detail_delay_seconds
-    query = "+".join(keywords) if keywords else "software"
+    queries: list[str] = keywords or DEFAULT_QUERIES
+    pages_per_query = max_pages or settings.scrape_pages_per_query
+    search_delay = settings.scrape_delay_seconds
+    workers = max(1, settings.scrape_detail_workers)
+    list_timeout = float(settings.scrape_detail_timeout_seconds)
 
     seen_urls: set[str] = set()
+    total_queries = len(queries)
 
-    for page_num in range(max_pages):
-        url = f"{BASE_URL}?q={query}&start={page_num}"
-        try:
-            page = Fetcher.get(url, stealthy_headers=True)
-            if page.status != 200:
-                if on_progress:
-                    on_progress(page=page_num + 1, error=True)
-                continue
-        except Exception:
-            if on_progress:
-                on_progress(page=page_num + 1, error=True)
-            continue
+    # region agent log
+    _agent_debug_log(
+        hypothesis_id="H0-scrape-config",
+        location="wuzzuf_scraper.py:scrape_wuzzuf_sync",
+        message="scrape config snapshot",
+        data={
+            "detail_workers": workers,
+            "pages_per_query": pages_per_query,
+            "detail_timeout_sec": list_timeout,
+            "search_delay_sec": search_delay,
+            "total_queries": total_queries,
+        },
+        run_id="post-fix",
+    )
+    # endregion
 
-        job_links = page.css('a[href*="/jobs/p/"]')
-        if not job_links:
-            break
+    for q_idx, query in enumerate(queries, start=1):
+        q_encoded = quote_plus(query)
 
-        count = 0
-        for link in job_links:
+        for page_num in range(pages_per_query):
+            url = f"{BASE_URL}?q={q_encoded}&start={page_num}"
             try:
-                job = _parse_card(link)
-                if not job:
+                page = Fetcher.get(url, stealthy_headers=True, timeout=list_timeout)
+                if page.status != 200:
+                    if on_progress:
+                        on_progress(query=query, page=page_num + 1, error=True,
+                                    queries_completed=q_idx - 1, total_queries=total_queries)
                     continue
-
-                if job.source_url in seen_urls:
-                    continue
-                seen_urls.add(job.source_url)
-
-                # Deep scrape: fetch the individual job detail page
-                time.sleep(detail_delay)
-                detail = _fetch_and_parse_detail(job.source_url)
-                if detail:
-                    desc = detail.description_text
-                    if detail.salary_raw:
-                        desc = f"Salary: {detail.salary_raw}\n\n{desc}"
-                    job.description_text = desc
-                    job.listed_skills = detail.listed_skills
-                    if detail.experience_range:
-                        job.experience_range = detail.experience_range
-                    if detail.job_type:
-                        job.job_type = detail.job_type
-
-                yield job
-                count += 1
             except Exception:
-                logger.warning("Error processing card", exc_info=True)
+                if on_progress:
+                    on_progress(query=query, page=page_num + 1, error=True,
+                                queries_completed=q_idx - 1, total_queries=total_queries)
                 continue
+
+            job_links = page.css('a[href*="/jobs/p/"]')
+            if not job_links:
+                break
+
+            # Parse cards into stubs first, deduping against seen_urls.
+            stubs: list[JobCreate] = []
+            for link in job_links:
+                try:
+                    stub = _parse_card(link)
+                except Exception:
+                    logger.warning("Error processing card", exc_info=True)
+                    continue
+                if not stub or stub.source_url in seen_urls:
+                    continue
+                seen_urls.add(stub.source_url)
+                stubs.append(stub)
+
+            # Parallel detail-page fetches.
+            count = 0
+            if stubs:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futures = {
+                        pool.submit(_fetch_and_parse_detail, s.source_url): s
+                        for s in stubs
+                    }
+                    for fut in as_completed(futures):
+                        stub = futures[fut]
+                        try:
+                            detail = fut.result()
+                        except Exception:
+                            logger.warning("Detail fetch failed for %s",
+                                           stub.source_url, exc_info=True)
+                            detail = None
+                        yield _merge_detail(stub, detail)
+                        count += 1
+
+            if on_progress:
+                on_progress(query=query, page=page_num + 1, count=count,
+                            queries_completed=q_idx - 1, total_queries=total_queries)
+
+            if page_num < pages_per_query - 1:
+                time.sleep(search_delay)
 
         if on_progress:
-            on_progress(page=page_num + 1, count=count)
-
-        if page_num < max_pages - 1:
-            time.sleep(delay)
+            on_progress(query=query, queries_completed=q_idx,
+                        total_queries=total_queries)
 
 
 def _parse_card(link) -> JobCreate | None:
