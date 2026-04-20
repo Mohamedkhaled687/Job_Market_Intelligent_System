@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import time
@@ -6,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Iterator
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus
 
 import httpx
 
@@ -18,37 +17,6 @@ from src.utils.config import get_settings
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://wuzzuf.net/search/jobs/"
-
-_DEBUG_LOG_PATH = (
-    "/home/mohamed-khaled/Projects/Faculty_Projects/Job_Market_Intelligent_System/"
-    ".cursor/debug-7cf068.log"
-)
-
-
-def _agent_debug_log(
-    *,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict,
-    run_id: str = "run1",
-) -> None:
-    # region agent log
-    payload = {
-        "sessionId": "7cf068",
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-        "runId": run_id,
-    }
-    try:
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-    # endregion
 
 # Curated role queries covering every JobCategory enum value.
 # Seniority tiers (junior/mid/senior/lead) arise naturally from each query's pages.
@@ -139,22 +107,6 @@ def _fetch_and_parse_detail(source_url: str) -> _DetailResult | None:
             return None
     except httpx.TimeoutException as exc:
         elapsed_ms = int((time.monotonic() - t0) * 1000)
-        path = urlparse(source_url).path or ""
-        # region agent log
-        _agent_debug_log(
-            hypothesis_id="H1-read-timeout",
-            location="wuzzuf_scraper.py:_fetch_and_parse_detail",
-            message="detail fetch timed out",
-            data={
-                "exc_type": type(exc).__name__,
-                "timeout_sec": timeout,
-                "elapsed_ms": elapsed_ms,
-                "path_prefix": path[:120],
-                "is_saudi_path": "/saudi/" in path,
-            },
-            run_id="post-fix",
-        )
-        # endregion
         logger.warning(
             "Detail page timed out (timeout=%ss, waited ~%sms): %s",
             timeout,
@@ -164,22 +116,12 @@ def _fetch_and_parse_detail(source_url: str) -> _DetailResult | None:
         return None
     except Exception as exc:
         elapsed_ms = int((time.monotonic() - t0) * 1000)
-        path = urlparse(source_url).path or ""
-        # region agent log
-        _agent_debug_log(
-            hypothesis_id="H2-other-fetch-error",
-            location="wuzzuf_scraper.py:_fetch_and_parse_detail",
-            message="detail fetch failed",
-            data={
-                "exc_type": type(exc).__name__,
-                "timeout_sec": timeout,
-                "elapsed_ms": elapsed_ms,
-                "path_prefix": path[:120],
-            },
-            run_id="post-fix",
+        logger.warning(
+            "Failed to fetch detail page %s (after ~%sms)",
+            source_url,
+            elapsed_ms,
+            exc_info=True,
         )
-        # endregion
-        logger.warning("Failed to fetch detail page %s", source_url, exc_info=True)
         return None
 
     return _parse_detail_page(page)
@@ -337,22 +279,6 @@ def scrape_wuzzuf_sync(
 
     seen_urls: set[str] = set()
     total_queries = len(queries)
-
-    # region agent log
-    _agent_debug_log(
-        hypothesis_id="H0-scrape-config",
-        location="wuzzuf_scraper.py:scrape_wuzzuf_sync",
-        message="scrape config snapshot",
-        data={
-            "detail_workers": workers,
-            "pages_per_query": pages_per_query,
-            "detail_timeout_sec": list_timeout,
-            "search_delay_sec": search_delay,
-            "total_queries": total_queries,
-        },
-        run_id="post-fix",
-    )
-    # endregion
 
     for q_idx, query in enumerate(queries, start=1):
         q_encoded = quote_plus(query)
