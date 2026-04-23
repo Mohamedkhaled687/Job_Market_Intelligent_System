@@ -10,9 +10,6 @@ from src.utils.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Ollama configuration
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "mistral"  # Lightweight, accurate model
 OLLAMA_TIMEOUT = 60  # seconds
 
 SKILL_EXTRACTION_PROMPT = """You are an expert technical recruiter and compensation analyst. Given the following job description,
@@ -85,26 +82,29 @@ def estimate_salary(seniority: str, category: str, location_text: str) -> int:
 
 
 async def extract_job_insights(description: str, title: str = "", location: str = "") -> Optional[dict]:
-    """Extract job insights using Ollama first, then Gemini, then fallback rules."""
+    """Extract job insights using Gemini first, then Ollama, then fallback rules."""
     location_line = f"\nLocation: {location}" if location.strip() else ""
     prompt = SKILL_EXTRACTION_PROMPT.replace(
         "{description}",
         f"{title}{location_line}\n{description}",
     )
 
-    # Try Ollama first (local, fast, private)
-    result = await _extract_with_ollama(prompt)
-    if result:
-        logger.info("✓ Job insights extracted via Ollama")
-        return result
-
-    # Fallback to Gemini API
     settings = get_settings()
+
+    # Try Gemini API first (Highest accuracy)
     if settings.google_api_key:
         result = await _extract_with_gemini(prompt, settings.google_api_key)
         if result:
             logger.info("✓ Job insights extracted via Gemini")
             return result
+        else:
+            logger.warning("Gemini key failed or expired, falling back to Ollama...")
+
+    # Try Ollama (local, fast, private)
+    result = await _extract_with_ollama(prompt)
+    if result:
+        logger.info("✓ Job insights extracted via Ollama")
+        return result
 
     # Final fallback to rule-based extraction
     logger.info("✓ Job insights extracted via fallback rules")
@@ -113,12 +113,13 @@ async def extract_job_insights(description: str, title: str = "", location: str 
 
 async def _extract_with_ollama(prompt: str) -> Optional[dict]:
     """Extract using local Ollama instance."""
+    settings = get_settings()
     try:
         async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             response = await client.post(
-                OLLAMA_API_URL,
+                settings.ollama_api_url,
                 json={
-                    "model": OLLAMA_MODEL,
+                    "model": settings.ollama_model,
                     "prompt": prompt,
                     "stream": False,
                     "temperature": 0.1,
