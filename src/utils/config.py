@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     scrape_max_pages: int = 5
     scrape_delay_seconds: float = 2.0
     scrape_detail_delay_seconds: float = 1.0
+    scrape_detail_workers: int = 6
+    scrape_detail_timeout_seconds: float = 45.0
+    scrape_enrich_concurrency: int = 5
+    scrape_pages_per_query: int = 3
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
