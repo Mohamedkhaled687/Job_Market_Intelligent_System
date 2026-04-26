@@ -1,9 +1,7 @@
 import asyncio
 import chromadb
-import os
-
 from src.models.database import connect_db, get_db, close_db
-from src.services.curriculum_fetcher import CurriculumFetcher
+from curriculum_fetcher import CurriculumFetcher
 
 async def ingest_to_chroma():
     print("1. Connecting to MongoDB...")
