@@ -64,6 +64,24 @@ async def root():
     }
 
 
+@app.get("/", tags=["Health"])
+async def root():
+    if FRONTEND_DIR.exists():
+        return RedirectResponse(url="/dashboard")
+
+    return {
+        "status": "ok",
+        "message": "Backend is running. Start the frontend dev server or build the frontend to enable the UI.",
+        "routes": {
+            "health": "/health",
+            "docs": "/docs",
+            "jobs": "/api",
+            "insights": "/api/insights/dashboard",
+            "study_plan": "/api/studyplan",
+        },
+    }
+
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "ok"}
