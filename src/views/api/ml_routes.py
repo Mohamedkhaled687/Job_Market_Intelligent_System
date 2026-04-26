@@ -9,12 +9,15 @@ Endpoints:
   GET /api/ml/models/metrics - Get model metrics
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import List, Dict, Optional, Any
 import asyncio
 import json
+import numpy as np
+import pandas as pd
 from pathlib import Path
+from typing import List, Dict, Optional, Any
+
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 
 from src.ml.train_models import load_trained_models, train_models
 from src.ml.models import ModelEnsemble
@@ -27,6 +30,20 @@ _models_cache: Optional[ModelEnsemble] = None
 _metrics_cache: Optional[Dict] = None
 MODELS_DIR = Path(__file__).parent.parent / "ml" / "trained_models"
 METRICS_PATH = MODELS_DIR / "metrics.json"
+
+# Shared constants
+SENIORITY_MAP = {
+    'junior': 0, 'mid': 1, 'mid-level': 1,
+    'senior': 2, 'lead': 3, 'manager': 3
+}
+
+TOP_SKILLS = [
+    'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust',
+    'react', 'vue', 'angular', 'django', 'fastapi', 'nodejs', 'express',
+    'postgresql', 'mongodb', 'mysql', 'redis', 'elasticsearch',
+    'aws', 'gcp', 'azure', 'docker', 'kubernetes',
+    'git', 'rest', 'graphql', 'sql', 'html', 'css'
+]
 
 
 def load_models() -> ModelEnsemble:
@@ -55,7 +72,7 @@ def load_metrics() -> Dict:
 # Request schemas
 class SalaryPredictionRequest(BaseModel):
     """Request for salary prediction"""
-    seniority: str  # junior, mid, senior, lead
+    seniority: str
     skill_count: int
     unique_skills: int
     has_python: int = 0
@@ -129,32 +146,12 @@ class CombinedPredictionResponse(BaseModel):
 
 @router.post("/predict-salary", response_model=SalaryPredictionResponse)
 async def predict_salary(request: SalaryPredictionRequest):
-    """
-    Predict job salary based on features.
-    
-    Example:
-    ```json
-    {
-      "seniority": "senior",
-      "skill_count": 5,
-      "unique_skills": 5,
-      "has_python": 1,
-      "has_react": 0,
-      "is_backend": 1,
-      "company_job_count": 10,
-      "days_posted": 5
-    }
-    ```
-    """
+    """Predict job salary based on features."""
     try:
         models = load_models()
-        
-        # Prepare feature vector
+
         features = {
-            'seniority_encoded': {
-                'junior': 0, 'mid': 1, 'mid-level': 1,
-                'senior': 2, 'lead': 3, 'manager': 3
-            }.get(request.seniority.lower(), 1),
+            'seniority_encoded': SENIORITY_MAP.get(request.seniority.lower(), 1),
             'skill_count': request.skill_count,
             'unique_skills': request.unique_skills,
             'has_python': request.has_python,
@@ -167,15 +164,11 @@ async def predict_salary(request: SalaryPredictionRequest):
             'company_job_count': request.company_job_count,
             'days_posted': request.days_posted,
         }
-        
-        import pandas as pd
+
         X = pd.DataFrame([features])
-        
         prediction = models.salary_model.predict(X)[0]
-        
-        # Calculate confidence interval (±15%)
         margin = prediction * 0.15
-        
+
         return SalaryPredictionResponse(
             predicted_salary=float(prediction),
             confidence_interval={
@@ -183,41 +176,19 @@ async def predict_salary(request: SalaryPredictionRequest):
                 'upper': float(prediction + margin),
             }
         )
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
 @router.post("/predict-category", response_model=CategoryPredictionResponse)
 async def predict_category(request: CategoryPredictionRequest):
-    """
-    Predict job category based on features and skills.
-    
-    Example:
-    ```json
-    {
-      "seniority": "senior",
-      "skill_count": 8,
-      "unique_skills": 8,
-      "has_python": 1,
-      "has_react": 1,
-      "company_job_count": 15,
-      "salary_estimate": 150000,
-      "skills": ["python", "react", "nodejs", "postgresql"]
-    }
-    ```
-    """
+    """Predict job category based on features and skills."""
     try:
         models = load_models()
-        
-        # Prepare features
-        seniority_map = {
-            'junior': 0, 'mid': 1, 'mid-level': 1,
-            'senior': 2, 'lead': 3, 'manager': 3
-        }
-        
+
         features = {
-            'seniority_encoded': seniority_map.get(request.seniority.lower(), 1),
+            'seniority_encoded': SENIORITY_MAP.get(request.seniority.lower(), 1),
             'skill_count': request.skill_count,
             'unique_skills': request.unique_skills,
             'has_python': request.has_python,
@@ -228,28 +199,15 @@ async def predict_category(request: CategoryPredictionRequest):
             'salary_estimate': request.salary_estimate,
             'days_posted': request.days_posted,
         }
-        
-        # Add skill features (top skills)
-        TOP_SKILLS = [
-            'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust',
-            'react', 'vue', 'angular', 'django', 'fastapi', 'nodejs', 'express',
-            'postgresql', 'mongodb', 'mysql', 'redis', 'elasticsearch',
-            'aws', 'gcp', 'azure', 'docker', 'kubernetes',
-            'git', 'rest', 'graphql', 'sql', 'html', 'css'
-        ]
-        
+
         request_skills_lower = [s.lower() for s in request.skills]
         for skill in TOP_SKILLS:
             features[f'skill_{skill}'] = 1 if skill in request_skills_lower else 0
-        
-        import pandas as pd
+
         X = pd.DataFrame([features])
-        
-        # Get predictions
         predictions = models.category_model.predict(X)[0]
         probabilities = models.category_model.predict_proba(X)[0]
-        
-        # Get top 3 predictions
+
         top_indices = np.argsort(probabilities)[-3:][::-1]
         top_3 = [
             {
@@ -258,31 +216,23 @@ async def predict_category(request: CategoryPredictionRequest):
             }
             for i in top_indices
         ]
-        
+
         return CategoryPredictionResponse(
             predicted_category=str(predictions),
             confidence=float(probabilities[np.argmax(probabilities)]),
             top_3_predictions=top_3,
         )
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
 @router.post("/predict-all", response_model=CombinedPredictionResponse)
 async def predict_all(request: CombinedPredictionRequest):
-    """
-    Predict both salary and category for a job.
-    
-    Combines both models for comprehensive job analysis.
-    """
+    """Predict both salary and category for a job."""
     try:
-        # Prepare data for salary model
         salary_features = {
-            'seniority_encoded': {
-                'junior': 0, 'mid': 1, 'mid-level': 1,
-                'senior': 2, 'lead': 3, 'manager': 3
-            }.get(request.seniority.lower(), 1),
+            'seniority_encoded': SENIORITY_MAP.get(request.seniority.lower(), 1),
             'skill_count': request.skill_count,
             'unique_skills': request.unique_skills,
             'has_python': request.has_python,
@@ -295,44 +245,28 @@ async def predict_all(request: CombinedPredictionRequest):
             'company_job_count': request.company_job_count,
             'days_posted': request.days_posted,
         }
-        
-        # Prepare data for category model
+
         category_features = {**salary_features}
         category_features.pop('is_backend', None)
         category_features.pop('is_frontend', None)
         category_features.pop('is_devops', None)
         category_features['salary_estimate'] = request.salary_estimate
-        
-        # Add skill features for category model
-        TOP_SKILLS = [
-            'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust',
-            'react', 'vue', 'angular', 'django', 'fastapi', 'nodejs', 'express',
-            'postgresql', 'mongodb', 'mysql', 'redis', 'elasticsearch',
-            'aws', 'gcp', 'azure', 'docker', 'kubernetes',
-            'git', 'rest', 'graphql', 'sql', 'html', 'css'
-        ]
-        
+
         request_skills_lower = [s.lower() for s in request.skills]
         for skill in TOP_SKILLS:
             category_features[f'skill_{skill}'] = 1 if skill in request_skills_lower else 0
-        
-        import pandas as pd
-        import numpy as np
-        
+
         X_salary = pd.DataFrame([salary_features])
         X_category = pd.DataFrame([category_features])
-        
+
         models = load_models()
-        
-        # Get salary prediction
+
         salary_pred = models.salary_model.predict(X_salary)[0]
         salary_margin = salary_pred * 0.15
-        
-        # Get category prediction
+
         category_pred = models.category_model.predict(X_category)[0]
         category_proba = models.category_model.predict_proba(X_category)[0]
-        category_confidence = float(np.max(category_proba))
-        
+
         return CombinedPredictionResponse(
             salary={
                 'predicted_salary': float(salary_pred),
@@ -343,10 +277,10 @@ async def predict_all(request: CombinedPredictionRequest):
             },
             category={
                 'predicted_category': str(category_pred),
-                'confidence': category_confidence,
+                'confidence': float(np.max(category_proba)),
             }
         )
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
@@ -361,7 +295,7 @@ async def models_status():
             'salary_model_trained': models.salary_model.is_trained,
             'category_model_trained': models.category_model.is_trained,
         }
-    except:
+    except Exception:
         return {
             'status': 'not_ready',
             'message': 'Models not trained. Run: python -m src.ml.train_models'
@@ -376,20 +310,14 @@ async def models_metrics():
         if not metrics:
             raise HTTPException(status_code=404, detail="Metrics not found")
         return metrics
-    except:
+    except Exception:
         raise HTTPException(status_code=503, detail="Models not trained yet")
 
 
 @router.post("/models/train")
 async def train_models_endpoint(background_tasks: BackgroundTasks):
-    """
-    Trigger model training in background.
-    
-    WARNING: This may take several minutes depending on data size.
-    """
-    # Run training in background
+    """Trigger model training in background."""
     background_tasks.add_task(asyncio.run, train_models(limit=10000))
-    
     return {
         'status': 'training_started',
         'message': 'Model training started in background. Check /api/ml/models/status for progress.'
@@ -427,7 +355,3 @@ async def models_info():
             'train': 'POST /api/ml/models/train',
         }
     }
-
-
-# For type hints
-import numpy as np

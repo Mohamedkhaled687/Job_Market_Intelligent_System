@@ -2,6 +2,8 @@
 Data preparation for ML models (Salary Prediction & Category Classification)
 """
 
+import ast
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from typing import Tuple, Dict, List, Optional
@@ -35,6 +37,11 @@ class MLDataPreparation:
         'git', 'rest', 'graphql', 'sql', 'html', 'css'
     ]
 
+    # Extra skills added to improve coverage
+    TOP_SKILLS += [
+        'bash', 'terraform', 'ansible', 'php', 'swift', 'kotlin', 'flutter'
+    ]
+
     def __init__(self, random_state: int = 42):
         self.random_state = random_state
         self.scaler = StandardScaler()
@@ -51,8 +58,49 @@ class MLDataPreparation:
             DataFrame with raw job data
         """
         analytics = AnalyticsService()
-        df = await analytics.get_job_dataframe(limit=limit)
-        return df
+        df_db = await analytics.get_job_dataframe(limit=limit)
+
+        # If local CSV datasets exist under src/ml/datasets, load and concatenate them.
+        datasets_dir = Path(__file__).parent / "datasets"
+        if datasets_dir.exists():
+            csv_files = sorted(datasets_dir.glob("*.csv"))
+            if csv_files:
+                dfs = []
+                for p in csv_files:
+                    try:
+                        local = pd.read_csv(p)
+                    except Exception:
+                        continue
+
+                    # Normalize normalized_skills column to lists
+                    if 'normalized_skills' in local.columns:
+                        def _parse_skills(x):
+                            if isinstance(x, str):
+                                s = x.strip()
+                                if s.startswith('['):
+                                    try:
+                                        return ast.literal_eval(s)
+                                    except Exception:
+                                        # fallback to comma split
+                                        return [it.strip() for it in s.strip('[]').split(',') if it.strip()]
+                                else:
+                                    return [it.strip() for it in s.split(',') if it.strip()]
+                            return x
+
+                        local['normalized_skills'] = local['normalized_skills'].apply(_parse_skills)
+
+                    dfs.append(local)
+
+                if dfs:
+                    df_local = pd.concat(dfs, ignore_index=True)
+                    try:
+                        df = pd.concat([df_db, df_local], ignore_index=True)
+                        return df
+                    except Exception:
+                        # If concatenation fails, fall back to DB only
+                        return df_db
+
+        return df_db
 
     def filter_valid_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -65,6 +113,10 @@ class MLDataPreparation:
             Cleaned dataframe
         """
         print(f"Original data: {len(df)} records")
+        
+        # Convert salary to numeric (handle strings from CSV)
+        if 'salary_estimate' in df.columns:
+            df['salary_estimate'] = pd.to_numeric(df['salary_estimate'], errors='coerce')
         
         # Remove missing salary
         df = df[df['salary_estimate'].notna() & (df['salary_estimate'] > 0)]
@@ -114,9 +166,16 @@ class MLDataPreparation:
         )
         
         # Backend category indicator
-        df['is_backend'] = (df['category'] == 'Backend').astype(int)
-        df['is_frontend'] = (df['category'] == 'Frontend').astype(int)
-        df['is_devops'] = (df['category'] == 'DevOps').astype(int)
+        # Normalize category casing and set boolean flags
+        df['category'] = df['category'].astype(str).str.strip()
+        df['category_norm'] = df['category'].str.lower()
+        df['is_backend'] = (df['category_norm'].str.contains('backend', na=False)).astype(int)
+        df['is_frontend'] = (df['category_norm'].str.contains('frontend', na=False)).astype(int)
+        df['is_devops'] = (df['category_norm'].str.contains('devops', na=False)).astype(int)
+        
+        # Normalize salary to ensure numeric
+        df['salary_estimate'] = pd.to_numeric(df['salary_estimate'], errors='coerce')
+        df = df[df['salary_estimate'].notna()]
         
         # Company size (proxy: number of postings)
         company_counts = df['company'].value_counts().to_dict()

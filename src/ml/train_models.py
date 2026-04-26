@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.ml.data_preparation import MLDataPreparation
 from src.ml.models import SalaryPredictionModel, CategoryClassificationModel, ModelEnsemble
+from src.models.database import connect_db, close_db
 
 
 # Model save paths
@@ -167,9 +168,19 @@ def load_trained_models() -> ModelEnsemble:
 
 
 if __name__ == "__main__":
-    # Run training
-    results = asyncio.run(train_models(limit=10000, test_size=0.2))
+    async def main():
+        # Initialize database
+        await connect_db()
+        
+        try:
+            # Run training
+            results = await train_models(limit=10000, test_size=0.2)
+            
+            print("\n Models trained successfully!")
+            print(f"   Salary Model R²: {results['metrics']['salary_prediction']['metrics']['r2']:.4f}")
+            print(f"   Category Accuracy: {results['metrics']['category_classification']['metrics']['accuracy']:.4f}")
+        finally:
+            # Close database connection
+            await close_db()
     
-    print("\n Models trained successfully!")
-    print(f"   Salary Model R²: {results['metrics']['salary_prediction']['metrics']['r2']:.4f}")
-    print(f"   Category Accuracy: {results['metrics']['category_classification']['metrics']['accuracy']:.4f}")
+    asyncio.run(main())

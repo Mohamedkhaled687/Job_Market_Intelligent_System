@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, TrendingUp, Users, Target } from "lucide-react";
 import { toast } from "sonner";
 import { useDashboard } from "@/hooks/useInsights";
 import { useTriggerScrape, useScrapeStatus } from "@/hooks/useScrape";
 import { ChartSkeleton } from "@/components/Skeleton";
+import { KPICard } from "@/components/KPICard";
 import { SkillBarChart } from "@/components/charts/SkillBarChart";
 import { TrendLineChart } from "@/components/charts/TrendLineChart";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";

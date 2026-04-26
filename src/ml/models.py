@@ -9,6 +9,7 @@ This module contains trained models and prediction utilities for:
 import numpy as np
 import pandas as pd
 from typing import Tuple, Dict, Any, Optional
+from sklearn.preprocessing import LabelEncoder
 import pickle
 from pathlib import Path
 
@@ -185,7 +186,8 @@ class CategoryClassificationModel:
             )
             self.is_trained = False
         
-        self.classes_ = None
+            self.classes_ = None
+            self.label_encoder: Optional[LabelEncoder] = None
     
     def train(self, X_train: pd.DataFrame, y_train: pd.Series,
               X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.Series] = None):
@@ -198,16 +200,33 @@ class CategoryClassificationModel:
             X_val: Validation features (optional)
             y_val: Validation categories (optional)
         """
+        # Always encode labels via LabelEncoder to ensure numeric classes
+        self.label_encoder = LabelEncoder()
+        y_train_enc = self.label_encoder.fit_transform(y_train.astype(str))
+        y_val_enc = None
+        if y_val is not None:
+            y_val_enc = self.label_encoder.transform(y_val.astype(str))
+
         eval_set = None
         if X_val is not None and y_val is not None:
-            eval_set = [(X_train, y_train), (X_val, y_val)]
-        
+            eval_set = [(X_train, y_train_enc), (X_val, y_val_enc)]
+
         self.model.fit(
-            X_train, y_train,
+            X_train, y_train_enc,
             eval_set=eval_set,
             verbose=10
         )
-        self.classes_ = self.model.classes_
+
+        # store classes in original label form if we encoded
+        if self.label_encoder is not None:
+            self.classes_ = list(self.label_encoder.classes_)
+        else:
+            # model.classes_ may be numeric; keep as list
+            try:
+                self.classes_ = list(self.model.classes_)
+            except Exception:
+                self.classes_ = []
+
         self.is_trained = True
         print(" Category classification model trained")
     
@@ -223,8 +242,14 @@ class CategoryClassificationModel:
         """
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call train() first.")
-        
-        return self.model.predict(X)
+
+        y_pred = self.model.predict(X)
+        if self.label_encoder is not None:
+            try:
+                y_pred = self.label_encoder.inverse_transform(y_pred.astype(int))
+            except Exception:
+                pass
+        return y_pred
     
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """

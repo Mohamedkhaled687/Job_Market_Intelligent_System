@@ -3,11 +3,17 @@ import { apiClient } from "@/api/client";
 
 export interface DashboardData {
   total_jobs: number;
+  total_companies: number;
   top_skills: { skill: string; count: number }[];
-  salary_stats: { avg_salary: number; min_salary: number; max_salary: number };
+  salary_stats: {
+    avg_salary: number;
+    min_salary: number;
+    max_salary: number;
+    median_salary: number;
+  };
   category_distribution: { category: string; count: number }[];
   seniority_distribution: { seniority: string; count: number }[];
-  top_companies: { company: string; count: number }[];
+  top_companies: { company: string; count: number; avg_salary?: number }[];
   monthly_trends: { month: string; count: number }[];
 }
 

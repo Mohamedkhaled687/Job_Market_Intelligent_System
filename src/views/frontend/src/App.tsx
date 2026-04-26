@@ -7,6 +7,7 @@ import { JobBrowserPage } from "@/pages/JobBrowserPage";
 import { JobDetailPage } from "@/pages/JobDetailPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ComparePage } from "@/pages/ComparePage";
+import { MLDashboardPage } from "@/pages/MLDashboardPage";
 import { StudyPlanChat } from "@/components/StudyPlanChat";
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/jobs/:id" element={<JobDetailPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/compare" element={<ComparePage />} />
+              <Route path="/ml" element={<MLDashboardPage />} />
             </Routes>
           </main>
         </div>
