@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Optional
 import numpy as np
 
@@ -127,7 +128,6 @@ async def get_skill_graph(min_weight: int = 3) -> dict:
     else:
         skill_field = "normalized_skills"
 
-    from collections import Counter
     node_counts: Counter = Counter()
     edge_counts: Counter = Counter()
 
@@ -438,4 +438,187 @@ async def get_full_analytics_dashboard() -> dict:
     return {
         "dashboard": dashboard,
         "skill_analysis": skill_metrics,
+    }
+
+
+_SENIORITY_RANK = {"junior": 0, "mid": 1, "senior": 2, "lead": 3}
+
+
+def _salary_base_match(location: Optional[str]) -> dict:
+    m: dict = {"salary_estimate": {"$gt": 0}}
+    if location:
+        m["location"] = {"$regex": location, "$options": "i"}
+    return m
+
+
+async def _avg_salary_group_by(db, match_stage: dict, field: str) -> list[dict]:
+    pipe = [
+        {"$match": match_stage},
+        {"$group": {
+            "_id": f"${field}",
+            "avg_salary": {"$avg": "$salary_estimate"},
+            "count": {"$sum": 1},
+        }},
+        {"$match": {"_id": {"$ne": None}}},
+        {"$project": {
+            field: "$_id",
+            "avg_salary": {"$round": ["$avg_salary", 0]},
+            "count": 1,
+            "_id": 0,
+        }},
+    ]
+    return await db.jobs.aggregate(pipe).to_list(length=80)
+
+
+def _sort_by_seniority_order(rows: list[dict]) -> list[dict]:
+    def rank(r: dict) -> int:
+        s = str(r.get("seniority") or "").lower()
+        return _SENIORITY_RANK.get(s, 50)
+
+    return sorted(rows, key=rank)
+
+
+# ---------------------------------------------------------------------------
+# Salary Intelligence
+# ---------------------------------------------------------------------------
+
+async def get_salary_intelligence(
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+    location: Optional[str] = None,
+) -> dict:
+    """Salary distribution with percentiles and category-aware role comparisons."""
+    db = get_db()
+
+    base = _salary_base_match(location)
+    match: dict = {**base}
+    if category:
+        match["category"] = category
+    if seniority:
+        match["seniority"] = seniority
+
+    pipeline = [
+        {"$match": match},
+        {"$project": {"salary_estimate": 1, "category": 1, "seniority": 1}},
+        {"$sort": {"salary_estimate": 1}},
+    ]
+    docs = await db.jobs.aggregate(pipeline).to_list(length=10000)
+    salaries = [d["salary_estimate"] for d in docs if d.get("salary_estimate")]
+
+    empty_extras = {
+        "role_comparisons": [],
+        "comparison_title": "",
+        "comparison_subtitle": "",
+        "comparison_mode": "none",
+    }
+
+    if not salaries:
+        return {
+            "percentiles": {"p25": 0, "p50": 0, "p75": 0, "p90": 0},
+            "distribution": [],
+            "count": 0,
+            "avg": 0,
+            **empty_extras,
+        }
+
+    salaries.sort()
+    n = len(salaries)
+
+    def percentile(p: float) -> int:
+        idx = int(p / 100 * (n - 1))
+        return round(salaries[idx])
+
+    p25, p50, p75, p90 = percentile(25), percentile(50), percentile(75), percentile(90)
+
+    bucket_size = max((salaries[-1] - salaries[0]) // 8, 1000)
+    buckets: Counter = Counter()
+    for s in salaries:
+        bucket = int(s // bucket_size) * bucket_size
+        buckets[bucket] += 1
+    distribution = [
+        {"range_start": k, "range_end": k + bucket_size, "count": v}
+        for k, v in sorted(buckets.items())
+    ]
+
+    # Role comparisons depend on which filters are active (same location on all branches).
+    role_comparisons: list[dict] = []
+    comparison_title = ""
+    comparison_subtitle = ""
+    comparison_mode = ""
+
+    if category and not seniority:
+        comp_match = {**base, "category": category, "seniority": {"$ne": None}}
+        raw = await _avg_salary_group_by(db, comp_match, "seniority")
+        raw = _sort_by_seniority_order(raw)
+        for r in raw:
+            s = r.get("seniority") or "unknown"
+            label = str(s).replace("_", " ").strip().title()
+            role_comparisons.append({
+                "label": label,
+                "category": category,
+                "seniority": s,
+                "avg_salary": r["avg_salary"],
+                "count": r["count"],
+            })
+        comparison_title = f"Seniority ladder — {category}"
+        comparison_subtitle = (
+            "Average pay at each level inside this category. "
+            "Use it to see how compensation climbs from junior to lead."
+        )
+        comparison_mode = "seniority_within_category"
+
+    elif seniority:
+        comp_match = {**base, "seniority": seniority, "category": {"$ne": None}}
+        raw = await _avg_salary_group_by(db, comp_match, "category")
+        raw.sort(key=lambda x: x["avg_salary"], reverse=True)
+        for r in raw:
+            cat = r["category"]
+            role_comparisons.append({
+                "label": cat,
+                "category": cat,
+                "seniority": seniority,
+                "avg_salary": r["avg_salary"],
+                "count": r["count"],
+            })
+        if category:
+            comparison_title = f"Same seniority ({seniority}), other categories"
+            comparison_subtitle = (
+                f"Benchmark {category} against other role types at the {seniority} level."
+            )
+        else:
+            comparison_title = f"Categories at {seniority} level"
+            comparison_subtitle = (
+                "Average salary by category for this seniority. "
+                "Helps compare pay across role types."
+            )
+        comparison_mode = "category_at_seniority"
+
+    else:
+        comp_match = {**base, "category": {"$ne": None}}
+        raw = await _avg_salary_group_by(db, comp_match, "category")
+        raw.sort(key=lambda x: x["avg_salary"], reverse=True)
+        for r in raw:
+            cat = r["category"]
+            role_comparisons.append({
+                "label": cat,
+                "category": cat,
+                "seniority": None,
+                "avg_salary": r["avg_salary"],
+                "count": r["count"],
+            })
+        comparison_title = "Market by category"
+        comparison_subtitle = (
+            "Average salary by role category across all seniority levels in the filtered data."
+        )
+        comparison_mode = "category_market_overview"
+
+    return {
+        "percentiles": {"p25": p25, "p50": p50, "p75": p75, "p90": p90},
+        "distribution": distribution,
+        "role_comparisons": role_comparisons,
+        "comparison_title": comparison_title,
+        "comparison_subtitle": comparison_subtitle,
+        "comparison_mode": comparison_mode,
+        "count": n,
+        "avg": round(sum(salaries) / n),
     }

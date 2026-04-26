@@ -69,3 +69,14 @@ async def company_analytics(top_n: int = Query(20, ge=5, le=100)):
 async def comprehensive_dashboard():
     """Get full analytics dashboard combining all insights."""
     return await analytics_controller.get_full_analytics_dashboard()
+
+
+@router.get("/salary-intelligence")
+async def salary_intelligence(
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+    location: Optional[str] = None,
+):
+    return await analytics_controller.get_salary_intelligence(
+        category=category, seniority=seniority, location=location,
+    )

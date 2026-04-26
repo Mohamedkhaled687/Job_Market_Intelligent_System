@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from src.models.database import connect_db, close_db
 from src.views.api.scraper_routes import router as scraper_router
@@ -44,6 +44,24 @@ app.include_router(jobs_router)
 app.include_router(insights_router)
 app.include_router(studyplan_router)
 app.include_router(ml_router)
+
+
+@app.get("/", tags=["Health"])
+async def root():
+    if FRONTEND_DIR.exists():
+        return RedirectResponse(url="/dashboard")
+
+    return {
+        "status": "ok",
+        "message": "Backend is running. Start the frontend dev server or build the frontend to enable the UI.",
+        "routes": {
+            "health": "/health",
+            "docs": "/docs",
+            "jobs": "/api",
+            "insights": "/api/insights/dashboard",
+            "study_plan": "/api/studyplan",
+        },
+    }
 
 
 @app.get("/health", tags=["Health"])

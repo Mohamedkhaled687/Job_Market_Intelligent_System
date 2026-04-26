@@ -17,9 +17,33 @@ export interface DashboardData {
   monthly_trends: { month: string; count: number }[];
 }
 
+export interface SkillGraphNode {
+  id: string;
+  count: number;
+}
+
 export interface SkillGraphData {
-  nodes: { id: string; count: number }[];
+  nodes: SkillGraphNode[];
   edges: { source: string; target: string; weight: number }[];
+}
+
+export interface RoleComparisonRow {
+  label: string;
+  avg_salary: number;
+  count: number;
+  category: string | null;
+  seniority: string | null;
+}
+
+export interface SalaryIntelData {
+  percentiles: { p25: number; p50: number; p75: number; p90: number };
+  distribution: { range_start: number; range_end: number; count: number }[];
+  role_comparisons: RoleComparisonRow[];
+  comparison_title: string;
+  comparison_subtitle: string;
+  comparison_mode: string;
+  count: number;
+  avg: number;
 }
 
 export function useDashboard(category?: string, seniority?: string) {
@@ -43,6 +67,25 @@ export function useSkillGraph(minWeight: number = 3) {
       const { data } = await apiClient.get("/api/insights/skill-graph", {
         params: { min_weight: minWeight },
       });
+      return data;
+    },
+    staleTime: 120_000,
+  });
+}
+
+export function useSalaryIntelligence(
+  category?: string,
+  seniority?: string,
+  location?: string,
+) {
+  return useQuery<SalaryIntelData>({
+    queryKey: ["salary-intelligence", { category, seniority, location }],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (category) params.category = category;
+      if (seniority) params.seniority = seniority;
+      if (location) params.location = location;
+      const { data } = await apiClient.get("/api/insights/salary-intelligence", { params });
       return data;
     },
     staleTime: 120_000,

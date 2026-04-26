@@ -1,7 +1,14 @@
+import logging
+import httpx
+
 from google import genai
 from google.genai import types as genai_types
 
 from src.utils.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+OLLAMA_TIMEOUT = 120
 
 STUDY_PLAN_SYSTEM_PROMPT = """\
 You are an expert career coach and technical mentor. The user will provide either:
@@ -53,32 +60,53 @@ the resource by name instead of providing a fake link.
 
 async def generate_study_plan(user_message: str) -> str:
     settings = get_settings()
-    if not settings.google_api_key:
-        return (
-            "**Study Plan Agent is unavailable** — no API key configured. "
-            "Please set `GOOGLE_API_KEY` in your `.env` file."
-        )
+    prompt = STUDY_PLAN_SYSTEM_PROMPT + "\n\nUser input:\n" + user_message
 
-    client = genai.Client(api_key=settings.google_api_key)
+    if settings.google_api_key:
+        try:
+            client = genai.Client(api_key=settings.google_api_key)
+            async with client.aio as aclient:
+                response = await aclient.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        genai_types.Content(
+                            role="user",
+                            parts=[genai_types.Part(text=prompt)],
+                        ),
+                    ],
+                    config=genai_types.GenerateContentConfig(
+                        temperature=0.4,
+                        max_output_tokens=4096,
+                    ),
+                )
+            logger.info("Study plan generated via Gemini")
+            return response.text.strip()
+        except Exception as exc:
+            logger.warning("Gemini failed for study plan, falling back to Ollama: %s", exc)
 
     try:
-        async with client.aio as aclient:
-            response = await aclient.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    genai_types.Content(
-                        role="user",
-                        parts=[genai_types.Part(text=STUDY_PLAN_SYSTEM_PROMPT + "\n\nUser input:\n" + user_message)],
-                    ),
-                ],
-                config=genai_types.GenerateContentConfig(
-                    temperature=0.4,
-                    max_output_tokens=4096,
-                ),
+        ollama_url = settings.ollama_api_url
+        ollama_model = settings.ollama_model
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            response = await client.post(
+                ollama_url,
+                json={
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.4,
+                },
             )
-        return response.text.strip()
+            response.raise_for_status()
+            data = response.json()
+            text = data.get("response", "").strip()
+            if text:
+                logger.info("Study plan generated via Ollama")
+                return text
     except Exception as exc:
-        return (
-            "**Sorry, I couldn't generate a study plan right now.** "
-            f"Error: {exc}"
-        )
+        logger.warning("Ollama failed for study plan: %s", exc)
+
+    return (
+        "**Sorry, I couldn't generate a study plan right now.** "
+        "Gemini key may be missing/expired and Ollama is unavailable."
+    )
