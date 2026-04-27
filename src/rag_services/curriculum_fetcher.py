@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 import logging
 import httpx
 import json
@@ -193,7 +193,7 @@ class CurriculumFetcher:
 
     async def get_courses_for_embedding(self) -> List[Dict]:
         """Get all courses for vector embedding."""
-        cursor = self.courses.find({}, {"courseId": 1, "title": 1, "description": 1})
+        cursor = self.courses.find({}, {"courseId": 1, "title": 1, "description": 1, "url": 1})
         return await cursor.to_list(length=None)
 
     async def get_blocks_for_course(self, course_id: str) -> List[Dict]:

@@ -1,8 +1,5 @@
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-import asyncio
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +11,7 @@ from src.views.api.jobs_routes import router as jobs_router
 from src.views.api.insights_routes import router as insights_router
 from src.views.api.studyplan_routes import router as studyplan_router
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from src.services.curriculum_fetcher import CurriculumFetcher
+from src.rag_services.curriculum_fetcher import CurriculumFetcher
 
 FRONTEND_DIR = Path(__file__).parent / "src" / "views" / "frontend" / "dist"
 

@@ -10,7 +10,7 @@ services:
         required: false
     environment:
       MONGODB_URI: mongodb://mongodb:27017
-      OLLAMA_API_URL: http://ollama:11434/api/generate
+      # (OLLAMA_API_URL removed)
     ports:
       - "8000:8000"
     volumes:
@@ -36,15 +36,6 @@ services:
       - "27017:27017"
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    restart: unless-stopped
-
 volumes:
   mongo_data:
-  ollama_data:
   chroma_data:
