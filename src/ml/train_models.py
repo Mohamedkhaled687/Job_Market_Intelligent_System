@@ -21,6 +21,20 @@ CATEGORY_MODEL_PATH = MODELS_DIR / "category_model.json"
 METRICS_PATH = MODELS_DIR / "metrics.json"
 
 
+def _to_builtin(value):
+    """Recursively convert NumPy/Pandas scalar values into JSON-serializable Python types."""
+    if isinstance(value, dict):
+        return {key: _to_builtin(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_to_builtin(item) for item in value]
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            return value
+    return value
+
+
 async def train_models(limit: int = 10000, test_size: float = 0.2):
     """
     Complete training pipeline for both models.
@@ -100,7 +114,7 @@ async def train_models(limit: int = 10000, test_size: float = 0.2):
     category_model.save(str(CATEGORY_MODEL_PATH))
     
     # Save metrics
-    all_metrics = {
+    all_metrics = _to_builtin({
         'salary_prediction': {
             'model_path': str(SALARY_MODEL_PATH),
             'metrics': salary_metrics,
@@ -117,7 +131,7 @@ async def train_models(limit: int = 10000, test_size: float = 0.2):
             'test_size': len(salary_data['X_test']),
             'test_split': test_size,
         }
-    }
+    })
     
     with open(METRICS_PATH, 'w') as f:
         json.dump(all_metrics, f, indent=2)

@@ -168,10 +168,15 @@ class CategoryClassificationModel:
         Args:
             model_path: Path to load existing model (optional)
         """
+        self.classes_: list[str] = []
+        self.label_encoder: Optional[LabelEncoder] = None
+        self.model_path = model_path
+
         if model_path and Path(model_path).exists():
             self.model = XGBClassifier()
             self.model.load_model(model_path)
             self.is_trained = True
+            self._load_metadata(model_path)
         else:
             self.model = XGBClassifier(
                 n_estimators=100,
@@ -181,13 +186,10 @@ class CategoryClassificationModel:
                 colsample_bytree=0.9,
                 random_state=42,
                 n_jobs=-1,
-                objective='multi:softmax',
+                objective='multi:softprob',
                 eval_metric='mlogloss',
             )
             self.is_trained = False
-        
-            self.classes_ = None
-            self.label_encoder: Optional[LabelEncoder] = None
     
     def train(self, X_train: pd.DataFrame, y_train: pd.Series,
               X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.Series] = None):
@@ -265,6 +267,24 @@ class CategoryClassificationModel:
             raise RuntimeError("Model not trained. Call train() first.")
         
         return self.model.predict_proba(X)
+
+    @staticmethod
+    def _metadata_path(filepath: str) -> Path:
+        return Path(filepath).with_suffix(".meta.json")
+
+    def _load_metadata(self, filepath: str) -> None:
+        metadata_path = self._metadata_path(filepath)
+        if not metadata_path.exists():
+            return
+
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+
+        self.classes_ = metadata.get("classes", [])
+        label_classes = metadata.get("label_encoder_classes")
+        if label_classes:
+            self.label_encoder = LabelEncoder()
+            self.label_encoder.classes_ = np.array(label_classes, dtype=object)
     
     def predict_with_confidence(self, X: pd.DataFrame, confidence_threshold: float = 0.5) -> Dict:
         """
@@ -344,6 +364,12 @@ class CategoryClassificationModel:
     def save(self, filepath: str):
         """Save model to disk."""
         self.model.save_model(filepath)
+        metadata = {
+            "classes": self.classes_,
+            "label_encoder_classes": self.label_encoder.classes_.tolist() if self.label_encoder is not None else None,
+        }
+        with open(self._metadata_path(filepath), "w") as f:
+            json.dump(metadata, f)
         print(f" Model saved to {filepath}")
     
     def get_feature_importance(self, feature_names: list) -> Dict[str, float]:

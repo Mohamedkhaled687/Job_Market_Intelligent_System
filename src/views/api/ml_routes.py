@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/ml", tags=["ml"])
 # Global model cache
 _models_cache: Optional[ModelEnsemble] = None
 _metrics_cache: Optional[Dict] = None
-MODELS_DIR = Path(__file__).parent.parent / "ml" / "trained_models"
+MODELS_DIR = Path(__file__).resolve().parents[2] / "ml" / "trained_models"
 METRICS_PATH = MODELS_DIR / "metrics.json"
 
 # Shared constants
@@ -42,7 +42,8 @@ TOP_SKILLS = [
     'react', 'vue', 'angular', 'django', 'fastapi', 'nodejs', 'express',
     'postgresql', 'mongodb', 'mysql', 'redis', 'elasticsearch',
     'aws', 'gcp', 'azure', 'docker', 'kubernetes',
-    'git', 'rest', 'graphql', 'sql', 'html', 'css'
+    'git', 'rest', 'graphql', 'sql', 'html', 'css',
+    'bash', 'terraform', 'ansible', 'php', 'swift', 'kotlin', 'flutter',
 ]
 
 
@@ -328,6 +329,44 @@ async def train_models_endpoint(background_tasks: BackgroundTasks):
 async def models_info():
     """Get model information and capabilities."""
     return {
+        'salary_model_info': {
+            'algorithm': 'XGBoost Regressor',
+            'training_samples': None,
+            'test_samples': None,
+            'input_features': [
+                'seniority_encoded',
+                'skill_count',
+                'unique_skills',
+                'has_python',
+                'has_react',
+                'has_aws',
+                'has_kubernetes',
+                'is_backend',
+                'is_frontend',
+                'is_devops',
+                'company_job_count',
+                'days_posted',
+            ],
+        },
+        'category_model_info': {
+            'algorithm': 'XGBoost Classifier',
+            'training_samples': None,
+            'test_samples': None,
+            'input_features': [
+                'seniority_encoded',
+                'skill_count',
+                'unique_skills',
+                'has_python',
+                'has_react',
+                'has_aws',
+                'has_kubernetes',
+                'company_job_count',
+                'salary_estimate',
+                'days_posted',
+                'skill_*',
+            ],
+            'categories': ['Backend', 'Frontend', 'DevOps', 'Full-Stack', 'Data'],
+        },
         'models': {
             'salary_prediction': {
                 'type': 'Regression',

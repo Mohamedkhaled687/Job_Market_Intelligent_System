@@ -46,6 +46,152 @@ class MLDataPreparation:
         self.random_state = random_state
         self.scaler = StandardScaler()
         self.category_encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+
+    @staticmethod
+    def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df.columns = [str(col).lstrip("\ufeff").strip() for col in df.columns]
+        return df
+
+    @staticmethod
+    def _parse_skill_list(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return []
+            if s.startswith('['):
+                try:
+                    parsed = ast.literal_eval(s)
+                    if isinstance(parsed, list):
+                        return [str(item).strip().lower() for item in parsed if str(item).strip()]
+                except Exception:
+                    pass
+            return [item.strip().lower() for item in s.strip('[]').split(',') if item.strip()]
+        return []
+
+    @staticmethod
+    def _infer_category_from_title(title: str) -> str:
+        text = title.lower()
+        if any(word in text for word in ["data scientist", "data analyst", "data engineer", "machine learning", "ml ", "ai "]):
+            return "data"
+        if any(word in text for word in ["devops", "site reliability", "sre", "platform engineer", "cloud engineer", "infrastructure"]):
+            return "devops"
+        if any(word in text for word in ["full stack", "full-stack", "fullstack"]):
+            return "fullstack"
+        if any(word in text for word in ["frontend", "front end", "front-end", "ui developer", "web developer", "react developer", "angular developer", "vue developer"]):
+            return "frontend"
+        if any(word in text for word in ["backend", "back end", "back-end", "api developer", ".net developer", "java developer", "python developer", "software engineer"]):
+            return "backend"
+        if any(word in text for word in ["mobile", "android", "ios", "flutter", "react native"]):
+            return "mobile"
+        if any(word in text for word in ["qa", "quality assurance", "test engineer", "tester", "sdet"]):
+            return "qa"
+        if any(word in text for word in ["designer", "ux", "ui/ux", "product designer"]):
+            return "design"
+        if any(word in text for word in ["manager", "director", "lead", "product owner", "project manager"]):
+            return "management"
+        return "other"
+
+    @staticmethod
+    def _infer_seniority(title: str, years: float) -> str:
+        text = title.lower()
+        if any(word in text for word in ["lead", "principal", "director", "head", "manager"]) or years >= 10:
+            return "lead"
+        if "senior" in text or years >= 5:
+            return "senior"
+        if "junior" in text or years <= 2:
+            return "junior"
+        return "mid"
+
+    @staticmethod
+    def _infer_skills(title: str, category: str) -> list[str]:
+        text = title.lower()
+        skills = {
+            "backend": ["python", "sql", "rest"],
+            "frontend": ["javascript", "html", "css"],
+            "fullstack": ["javascript", "react", "sql"],
+            "devops": ["docker", "aws", "kubernetes"],
+            "data": ["python", "sql", "pandas"],
+            "mobile": ["swift", "kotlin", "rest"],
+            "qa": ["testing", "pytest", "selenium"],
+            "management": ["communication", "agile", "roadmapping"],
+            "design": ["figma", "ui", "ux"],
+            "other": [],
+        }.get(category, []).copy()
+
+        keyword_skills = {
+            "python": "python",
+            "java": "java",
+            "react": "react",
+            "angular": "angular",
+            "vue": "vue",
+            "node": "nodejs",
+            "django": "django",
+            "fastapi": "fastapi",
+            "aws": "aws",
+            "azure": "azure",
+            "gcp": "gcp",
+            "docker": "docker",
+            "kubernetes": "kubernetes",
+            "sql": "sql",
+            "ios": "ios",
+            "android": "android",
+            "flutter": "flutter",
+            "qa": "testing",
+            "test": "testing",
+        }
+        for keyword, skill in keyword_skills.items():
+            if keyword in text and skill not in skills:
+                skills.append(skill)
+        return skills
+
+    def _normalize_standard_dataset(self, df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+        local = self._clean_columns(df)
+        local["normalized_skills"] = local.get("normalized_skills", pd.Series(dtype=object)).apply(self._parse_skill_list)
+        if "company" not in local.columns:
+            local["company"] = [f"{source_name}-{i}" for i in range(len(local))]
+        if "title" not in local.columns:
+            local["title"] = local.get("job_title", "Unknown Role")
+        if "posted_date" not in local.columns:
+            local["posted_date"] = pd.Timestamp.now().normalize()
+        return local
+
+    def _normalize_salary_profile_dataset(self, df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+        local = self._clean_columns(df)
+        required = {"Job Title", "Years of Experience", "Salary"}
+        if not required.issubset(local.columns):
+            return pd.DataFrame()
+
+        local = local.dropna(subset=["Job Title", "Salary"]).copy()
+        local["Salary"] = pd.to_numeric(local["Salary"], errors="coerce")
+        local["Years of Experience"] = pd.to_numeric(local["Years of Experience"], errors="coerce").fillna(0)
+        local = local[local["Salary"].notna() & (local["Salary"] > 0)]
+
+        local["category"] = local["Job Title"].astype(str).apply(self._infer_category_from_title)
+        local["seniority"] = [
+            self._infer_seniority(str(title), float(years))
+            for title, years in zip(local["Job Title"], local["Years of Experience"])
+        ]
+        local["normalized_skills"] = [
+            self._infer_skills(str(title), category)
+            for title, category in zip(local["Job Title"], local["category"])
+        ]
+        local["salary_estimate"] = local["Salary"]
+        local["title"] = local["Job Title"].astype(str)
+        local["company"] = [f"{source_name}-{i}" for i in range(len(local))]
+        local["posted_date"] = pd.Timestamp.now().normalize()
+        return local[["title", "company", "category", "salary_estimate", "normalized_skills", "seniority", "posted_date"]]
+
+    def _normalize_local_dataset(self, df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+        local = self._clean_columns(df)
+        standard_columns = {"salary_estimate", "category", "normalized_skills", "seniority"}
+        if standard_columns.issubset(local.columns):
+            return self._normalize_standard_dataset(local, source_name)
+        if {"Job Title", "Years of Experience", "Salary"}.issubset(local.columns):
+            return self._normalize_salary_profile_dataset(local, source_name)
+        return pd.DataFrame()
         
     async def get_raw_data(self, limit: int = 10000) -> pd.DataFrame:
         """
@@ -72,24 +218,9 @@ class MLDataPreparation:
                     except Exception:
                         continue
 
-                    # Normalize normalized_skills column to lists
-                    if 'normalized_skills' in local.columns:
-                        def _parse_skills(x):
-                            if isinstance(x, str):
-                                s = x.strip()
-                                if s.startswith('['):
-                                    try:
-                                        return ast.literal_eval(s)
-                                    except Exception:
-                                        # fallback to comma split
-                                        return [it.strip() for it in s.strip('[]').split(',') if it.strip()]
-                                else:
-                                    return [it.strip() for it in s.split(',') if it.strip()]
-                            return x
-
-                        local['normalized_skills'] = local['normalized_skills'].apply(_parse_skills)
-
-                    dfs.append(local)
+                    normalized = self._normalize_local_dataset(local, p.stem)
+                    if not normalized.empty:
+                        dfs.append(normalized)
 
                 if dfs:
                     df_local = pd.concat(dfs, ignore_index=True)
@@ -285,10 +416,14 @@ class MLDataPreparation:
         X = pd.concat([X.reset_index(drop=True), skill_dummies.reset_index(drop=True)], axis=1)
         
         # Split
+        stratify_target = target if target.value_counts().min() >= 2 else None
+        if stratify_target is None:
+            print("Category split fallback: using non-stratified split because at least one class has fewer than 2 samples")
+
         X_train, X_test, y_train, y_test = train_test_split(
             X, target,
             test_size=test_size,
-            stratify=target,  # Stratified for balanced splits
+            stratify=stratify_target,
             random_state=self.random_state
         )
         
