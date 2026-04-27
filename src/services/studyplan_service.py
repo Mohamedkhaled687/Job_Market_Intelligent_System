@@ -58,67 +58,47 @@ Rules:
 
 async def generate_study_plan(user_message: str) -> str:
     settings = get_settings()
-    
-    # --- RAG RETRIEVAL STEP using search_courses.py ---
-    # We use asyncio.to_thread because ChromaDB is synchronous 
-    # and we don't want to block the FastAPI event loop
+
+    if not settings.google_api_key:
+        logger.error("GOOGLE_API_KEY is not set. Study plan generation requires Gemini.")
+        return (
+            "**Sorry, I couldn't generate a study plan right now.** "
+            "Gemini API key is missing or not configured."
+        )
+
+    # --- RAG RETRIEVAL STEP ---
     matches = await asyncio.to_thread(search_database, user_message, 4)
-    
+
     relevant_context = ""
     if matches:
         relevant_context = "\n\n### Context Resources (Highly Recommended freeCodeCamp Courses):\n"
         for m in matches:
             relevant_context += f"- **{m['title']}**: {m['description']}... (URL: {m['url']})\n"
 
-    # Assemble the final prompt
     prompt = STUDY_PLAN_SYSTEM_PROMPT + relevant_context + "\n\nUser input:\n" + user_message
 
-    # --- RAG GENERATION STEP ---
-    if settings.google_api_key:
-        try:
-            client = genai.Client(api_key=settings.google_api_key)
-            async with client.aio as aclient:
-                response = await aclient.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[
-                        genai_types.Content(
-                            role="user",
-                            parts=[genai_types.Part(text=prompt)],
-                        ),
-                    ],
-                    config=genai_types.GenerateContentConfig(
-                        temperature=0.4,
-                        max_output_tokens=4096,
-                    ),
-                )
-            logger.info("Study plan generated via Gemini (RAG Augmented)")
-            return response.text.strip()
-        except Exception as exc:
-            logger.warning("Gemini failed for study plan, falling back to Ollama: %s", exc)
-
+    # --- RAG GENERATION STEP (Gemini only) ---
     try:
-        ollama_url = settings.ollama_api_url
-        ollama_model = settings.ollama_model
-        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-            response = await client.post(
-                ollama_url,
-                json={
-                    "model": ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.4,
-                },
+        client = genai.Client(api_key=settings.google_api_key)
+        async with client.aio as aclient:
+            response = await aclient.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part(text=prompt)],
+                    ),
+                ],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.4,
+                    max_output_tokens=4096,
+                ),
             )
-            response.raise_for_status()
-            data = response.json()
-            text = data.get("response", "").strip()
-            if text:
-                logger.info("Study plan generated via Ollama (RAG Augmented)")
-                return text
+        logger.info("Study plan generated via Gemini (RAG Augmented)")
+        return response.text.strip()
     except Exception as exc:
-        logger.warning("Ollama failed for study plan: %s", exc)
-
-    return (
-        "**Sorry, I couldn't generate a study plan right now.** "
-        "Gemini key may be missing/expired and Ollama is unavailable."
-    )
+        logger.error("Gemini failed for study plan: %s", exc)
+        return (
+            "**Sorry, I couldn't generate a study plan right now.** "
+            "The AI service is temporarily unavailable. Please try again later."
+        )
