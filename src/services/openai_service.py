@@ -1,10 +1,16 @@
 import json
+import logging
 from typing import Optional
 
+import httpx
 from google import genai
 from google.genai import types as genai_types
 
 from src.utils.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+OLLAMA_TIMEOUT = 60  # seconds
 
 SKILL_EXTRACTION_PROMPT = """You are an expert technical recruiter and compensation analyst. Given the following job description,
 extract a JSON object with these fields:
@@ -14,7 +20,7 @@ extract a JSON object with these fields:
   "seniority": "junior|mid|senior|lead",
   "certifications": ["cert1"],
   "salary_estimate_usd": <number>,
-  "category": "backend|frontend|fullstack|data|devops|mobile|design|management|qa|other"
+  "category": "backend|frontend|fullstack|ai|data|devops|mobile|design|management|qa|other"
 }
 
 Rules:
@@ -49,7 +55,7 @@ _MARKET_RATES_USD: dict[str, dict[str, int]] = {
 }
 
 _CATEGORY_MULTIPLIER: dict[str, float] = {
-    "data": 1.20, "devops": 1.15, "fullstack": 1.10, "backend": 1.05,
+    "ai": 1.25, "data": 1.20, "devops": 1.15, "fullstack": 1.10, "backend": 1.05,
     "frontend": 1.00, "mobile": 1.05, "management": 1.15,
     "design": 0.90, "qa": 0.90, "other": 1.00,
 }
@@ -76,18 +82,81 @@ def estimate_salary(seniority: str, category: str, location_text: str) -> int:
 
 
 async def extract_job_insights(description: str, title: str = "", location: str = "") -> Optional[dict]:
-    settings = get_settings()
-    if not settings.google_api_key:
-        return _fallback_extraction(description, title, location)
-
-    client = genai.Client(api_key=settings.google_api_key)
+    """Extract job insights using Gemini first, then Ollama, then fallback rules."""
     location_line = f"\nLocation: {location}" if location.strip() else ""
     prompt = SKILL_EXTRACTION_PROMPT.replace(
         "{description}",
         f"{title}{location_line}\n{description}",
     )
 
+    settings = get_settings()
+
+    # Try Gemini API first (Highest accuracy)
+    if settings.google_api_key:
+        result = await _extract_with_gemini(prompt, settings.google_api_key)
+        if result:
+            logger.info("✓ Job insights extracted via Gemini")
+            return result
+        else:
+            logger.warning("Gemini key failed or expired, falling back to Ollama...")
+
+    # Try Ollama (local, fast, private)
+    result = await _extract_with_ollama(prompt)
+    if result:
+        logger.info("✓ Job insights extracted via Ollama")
+        return result
+
+    # Final fallback to rule-based extraction
+    logger.info("✓ Job insights extracted via fallback rules")
+    return _fallback_extraction(description, title, location)
+
+
+async def _extract_with_ollama(prompt: str) -> Optional[dict]:
+    """Extract using local Ollama instance."""
+    settings = get_settings()
     try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            response = await client.post(
+                settings.ollama_api_url,
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 500,
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data.get("response", "").strip()
+            
+            if not content:
+                return None
+            
+            # Extract JSON from response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            
+            result = json.loads(content)
+            return result
+    except httpx.ConnectError:
+        logger.debug("Ollama not available, trying next method...")
+        return None
+    except (json.JSONDecodeError, KeyError, IndexError) as e:
+        logger.warning(f"Ollama returned invalid JSON: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Ollama error: {e}")
+        return None
+
+
+async def _extract_with_gemini(prompt: str, api_key: str) -> Optional[dict]:
+    """Extract using Google Gemini API."""
+    try:
+        client = genai.Client(api_key=api_key)
         async with client.aio as aclient:
             response = await aclient.models.generate_content(
                 model="gemini-2.5-flash",
@@ -101,8 +170,9 @@ async def extract_job_insights(description: str, title: str = "", location: str 
         if content.startswith("```"):
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
         return json.loads(content)
-    except Exception:
-        return _fallback_extraction(description, title, location)
+    except Exception as e:
+        logger.warning(f"Gemini error: {e}")
+        return None
 
 
 def _fallback_extraction(description: str, title: str = "", location: str = "") -> dict:
@@ -150,12 +220,15 @@ def _fallback_extraction(description: str, title: str = "", location: str = "") 
 
     category = "other"
     category_map = {
-        "backend": ["backend", "back-end", "server-side", "api developer"],
-        "frontend": ["frontend", "front-end", "ui developer", "ui engineer"],
-        "fullstack": ["fullstack", "full-stack", "full stack"],
-        "data": ["data engineer", "data scientist", "data analyst", "machine learning", "ml engineer", "ai engineer"],
+        "ai": ["ai engineer", "machine learning engineer", "ml engineer",
+               "deep learning", "nlp", "computer vision", "generative ai", "llm"],
+        "data": ["data engineer", "data scientist", "data analyst",
+                 "machine learning", "big data", "etl"],
         "devops": ["devops", "sre", "site reliability", "infrastructure", "platform engineer"],
         "mobile": ["mobile", "android", "ios", "flutter", "react native"],
+        "fullstack": ["fullstack", "full-stack", "full stack"],
+        "backend": ["backend", "back-end", "server-side", "api developer"],
+        "frontend": ["frontend", "front-end", "ui developer", "ui engineer"],
         "design": ["ui/ux", "ux designer", "ui designer", "product designer"],
         "management": ["project manager", "product manager", "engineering manager", "tech lead", "team lead"],
         "qa": ["qa", "quality assurance", "test engineer", "sdet"],

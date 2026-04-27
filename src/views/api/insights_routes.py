@@ -25,3 +25,14 @@ async def dashboard(
 @router.get("/skill-graph")
 async def skill_graph(min_weight: int = Query(3, ge=1)):
     return await analytics_controller.get_skill_graph(min_weight=min_weight)
+
+
+@router.get("/salary-intelligence")
+async def salary_intelligence(
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+    location: Optional[str] = None,
+):
+    return await analytics_controller.get_salary_intelligence(
+        category=category, seniority=seniority, location=location,
+    )
