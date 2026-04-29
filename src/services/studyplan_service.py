@@ -63,7 +63,7 @@ async def generate_study_plan(user_message: str) -> str:
         try:
             client = genai.Client(api_key=settings.google_api_key)
             response = await client.aio.models.generate_content(
-                model="gemini-flash-latest",
+                model="gemini-2.5-flash",
                 contents=[
                     genai_types.Content(
                         role="user",
