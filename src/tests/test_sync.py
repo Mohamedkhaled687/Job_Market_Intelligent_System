@@ -1,7 +1,7 @@
 # test_sync.py
 import asyncio
 from src.models.database import connect_db, get_db, close_db
-from src.services.curriculum_fetcher import CurriculumFetcher
+from src.rag_services.curriculum_fetcher import CurriculumFetcher
 
 async def test():
     print("1. Connecting to MongoDB...")
