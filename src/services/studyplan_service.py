@@ -11,10 +11,6 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_TIMEOUT = 120
 
-logger = logging.getLogger(__name__)
-
-OLLAMA_TIMEOUT = 120
-
 STUDY_PLAN_SYSTEM_PROMPT = """\
 You are an expert career coach and technical mentor. The user will provide either:
 - A job description (pasted from a job board), OR
