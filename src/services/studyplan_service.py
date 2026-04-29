@@ -1,7 +1,14 @@
+import logging
+import httpx
+
 from google import genai
 from google.genai import types as genai_types
 
 from src.utils.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+OLLAMA_TIMEOUT = 120
 
 STUDY_PLAN_SYSTEM_PROMPT = """\
 You are an expert career coach and technical mentor. The user will provide either:
@@ -41,34 +48,26 @@ For each core skill at working proficiency:
 - Summary table: skill → phase → estimated hours
 
 Rules:
-- Use REAL, well-known URLs (official documentation, freeCodeCamp, MDN, Coursera, \
-Udemy, YouTube channels like Traversy Media, Fireship, Tech With Tim, etc.).
-- Do NOT invent or hallucinate URLs. If unsure of a URL, recommend searching for \
-the resource by name instead of providing a fake link.
-- Keep the plan concise but actionable — no filler paragraphs.
-- Tailor the plan to the seniority implied by the input (entry-level vs senior).
+- Provide DIRECT links to high-quality resources (YouTube videos, official documentation, MDN, freeCodeCamp, etc.).
+- NEVER provide "Search Query" links (e.g., no google.com/search or youtube.com/results links).
+- If you are not 100% sure of a direct URL, simply state the name of the resource and the platform in plain text (e.g., "Watch Traversy Media's JavaScript Crash Course on YouTube").
 - Respond ONLY in Markdown. No JSON, no code fences around the whole response.
 """
 
 
 async def generate_study_plan(user_message: str) -> str:
     settings = get_settings()
-    if not settings.google_api_key:
-        return (
-            "**Study Plan Agent is unavailable** — no API key configured. "
-            "Please set `GOOGLE_API_KEY` in your `.env` file."
-        )
+    prompt = STUDY_PLAN_SYSTEM_PROMPT + "\n\nUser input:\n" + user_message
 
-    client = genai.Client(api_key=settings.google_api_key)
-
-    try:
-        async with client.aio as aclient:
-            response = await aclient.models.generate_content(
+    if settings.google_api_key:
+        try:
+            client = genai.Client(api_key=settings.google_api_key)
+            response = await client.aio.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
                     genai_types.Content(
                         role="user",
-                        parts=[genai_types.Part(text=STUDY_PLAN_SYSTEM_PROMPT + "\n\nUser input:\n" + user_message)],
+                        parts=[genai_types.Part(text=prompt)],
                     ),
                 ],
                 config=genai_types.GenerateContentConfig(
@@ -76,9 +75,36 @@ async def generate_study_plan(user_message: str) -> str:
                     max_output_tokens=4096,
                 ),
             )
-        return response.text.strip()
+            logger.info("Study plan generated via Gemini")
+            return response.text.strip()
+        except Exception as exc:
+            logger.warning("Gemini failed for study plan, falling back to Ollama: %s", exc)
+
+    try:
+        ollama_url = settings.ollama_api_url
+        ollama_model = settings.ollama_model
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            response = await client.post(
+                ollama_url,
+                json={
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.4,
+                    },
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            text = data.get("response", "").strip()
+            if text:
+                logger.info("Study plan generated via Ollama")
+                return text
     except Exception as exc:
-        return (
-            "**Sorry, I couldn't generate a study plan right now.** "
-            f"Error: {exc}"
-        )
+        logger.warning("Ollama failed for study plan: %s", repr(exc))
+
+    return (
+        "**Sorry, I couldn't generate a study plan right now.** "
+        "Gemini key may be missing/expired and Ollama is unavailable."
+    )
