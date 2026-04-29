@@ -95,36 +95,44 @@ def _fetch_and_parse_detail(source_url: str) -> _DetailResult | None:
     """Fetch a single Wuzzuf job-detail page and extract structured data."""
     settings = get_settings()
     timeout = float(settings.scrape_detail_timeout_seconds)
+    detail_delay = float(settings.scrape_detail_delay_seconds)
     t0 = time.monotonic()
-    try:
-        page = Fetcher.get(
-            source_url,
-            stealthy_headers=True,
-            timeout=timeout,
-        )
-        if page.status != 200:
-            logger.warning("Detail page returned %s for %s", page.status, source_url)
-            return None
-    except httpx.TimeoutException as exc:
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        logger.warning(
-            "Detail page timed out (timeout=%ss, waited ~%sms): %s",
-            timeout,
-            elapsed_ms,
-            source_url,
-        )
-        return None
-    except Exception as exc:
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        logger.warning(
-            "Failed to fetch detail page %s (after ~%sms)",
-            source_url,
-            elapsed_ms,
-            exc_info=True,
-        )
-        return None
 
-    return _parse_detail_page(page)
+    for attempt in range(3):
+        try:
+            page = Fetcher.get(
+                source_url,
+                stealthy_headers=True,
+                timeout=timeout,
+            )
+            if page.status == 429:
+                wait = 10 * (attempt + 1)
+                logger.warning("Detail 429 for %s - waiting %ss (attempt %s/3)",
+                               source_url, wait, attempt + 1)
+                time.sleep(wait)
+                continue
+            if page.status != 200:
+                logger.warning("Detail page returned %s for %s", page.status, source_url)
+                return None
+            time.sleep(detail_delay)
+            return _parse_detail_page(page)
+        except httpx.TimeoutException:
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            logger.warning(
+                "Detail page timed out (timeout=%ss, waited ~%sms): %s",
+                timeout, elapsed_ms, source_url,
+            )
+            return None
+        except Exception:
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            logger.warning(
+                "Failed to fetch detail page %s (after ~%sms)",
+                source_url, elapsed_ms, exc_info=True,
+            )
+            return None
+
+    logger.warning("Detail page gave up after 3x 429: %s", source_url)
+    return None
 
 
 def _parse_detail_page(page) -> _DetailResult:
@@ -285,17 +293,37 @@ def scrape_wuzzuf_sync(
 
         for page_num in range(pages_per_query):
             url = f"{BASE_URL}?q={q_encoded}&start={page_num}"
-            try:
-                page = Fetcher.get(url, stealthy_headers=True, timeout=list_timeout)
-                if page.status != 200:
+            for attempt in range(3):
+                try:
+                    page = Fetcher.get(url, stealthy_headers=True, timeout=list_timeout)
+                    if page.status == 429:
+                        wait = 15 * (attempt + 1)
+                        logger.warning(
+                            "List page 429 for query=%r page=%s - waiting %ss (attempt %s/3)",
+                            query, page_num + 1, wait, attempt + 1,
+                        )
+                        time.sleep(wait)
+                        continue
+                    if page.status != 200:
+                        if on_progress:
+                            on_progress(query=query, page=page_num + 1, error=True,
+                                        queries_completed=q_idx - 1, total_queries=total_queries)
+                        break
+                    break  # success
+                except Exception:
                     if on_progress:
                         on_progress(query=query, page=page_num + 1, error=True,
                                     queries_completed=q_idx - 1, total_queries=total_queries)
-                    continue
-            except Exception:
+                    page = None
+                    break
+            else:
+                # All 3 attempts returned 429
                 if on_progress:
                     on_progress(query=query, page=page_num + 1, error=True,
                                 queries_completed=q_idx - 1, total_queries=total_queries)
+                continue
+
+            if page is None or page.status != 200:
                 continue
 
             job_links = page.css('a[href*="/jobs/p/"]')
