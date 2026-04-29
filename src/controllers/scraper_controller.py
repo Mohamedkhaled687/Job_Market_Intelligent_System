@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from src.models.database import get_db
 from src.models.schemas import CrawlLogCreate
 from src.services.wuzzuf_scraper import scrape_wuzzuf_sync
-from src.services.openai_service import extract_job_insights, estimate_salary
+from src.services.Ai_Enrich_Service import extract_job_insights, estimate_salary
 from src.utils.config import get_settings
 
 _task_registry: dict[str, dict] = {}

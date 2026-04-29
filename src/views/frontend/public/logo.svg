@@ -1,0 +1,14 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JobBoard Intel logo">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bgGrad)"/>
+  <rect x="56" y="140" width="24" height="48" rx="8" fill="#FFFFFF"/>
+  <rect x="96" y="108" width="24" height="80" rx="8" fill="#FFFFFF"/>
+  <rect x="136" y="88" width="24" height="100" rx="8" fill="#FFFFFF"/>
+  <path d="M54 88h54a10 10 0 0 0 10-10V68a10 10 0 0 0-10-10H64a10 10 0 0 0-10 10v20Z" fill="#FFFFFF" opacity="0.95"/>
+  <circle cx="188" cy="70" r="12" fill="#FFFFFF" opacity="0.95"/>
+</svg>

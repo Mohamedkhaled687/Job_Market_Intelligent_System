@@ -233,8 +233,16 @@ async def get_salary_intelligence(
     n = len(salaries)
 
     def percentile(p: float) -> int:
-        idx = int(p / 100 * (n - 1))
-        return round(salaries[idx])
+        # Linear interpolation avoids overly coarse percentile jumps.
+        pos = (p / 100) * (n - 1)
+        lower_idx = int(pos)
+        upper_idx = min(lower_idx + 1, n - 1)
+        if lower_idx == upper_idx:
+            return round(salaries[lower_idx])
+        weight_upper = pos - lower_idx
+        weight_lower = 1 - weight_upper
+        interpolated = salaries[lower_idx] * weight_lower + salaries[upper_idx] * weight_upper
+        return round(interpolated)
 
     p25, p50, p75, p90 = percentile(25), percentile(50), percentile(75), percentile(90)
 

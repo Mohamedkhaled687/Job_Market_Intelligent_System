@@ -40,3 +40,7 @@ scrapling_logs/
 
 job_board_architecture.md
 review_notes.md
+
+### Report artifacts (keep compiled PDF)
+report/*
+!report/report.pdf

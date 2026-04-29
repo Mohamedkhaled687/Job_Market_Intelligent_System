@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 
 from src.models.database import connect_db, close_db
 from src.views.api.scraper_routes import router as scraper_router
@@ -47,7 +47,7 @@ app.include_router(studyplan_router)
 @app.get("/", tags=["Health"])
 async def root():
     if FRONTEND_DIR.exists():
-        return RedirectResponse(url="/dashboard")
+        return FileResponse(str(FRONTEND_DIR / "index.html"))
 
     return {
         "status": "ok",

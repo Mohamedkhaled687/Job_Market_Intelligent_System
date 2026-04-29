@@ -30,10 +30,7 @@ export function SalaryIntelPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Salary Intelligence</h1>
-        <p className="mt-1 text-[hsl(var(--muted-foreground))]">
-          Salary distributions, percentiles, and role comparisons driven by your filters — no AI, only aggregated job data.
-        </p>
+        <h1 className="text-2xl font-bold">Salary Staticstics</h1>
       </div>
 
       <div className="flex flex-wrap gap-3">
