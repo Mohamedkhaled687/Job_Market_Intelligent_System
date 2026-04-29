@@ -94,9 +94,7 @@ async def generate_study_plan(user_message: str) -> str:
                     "model": ollama_model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {
-                        "temperature": 0.4,
-                    },
+                    "temperature": 0.4,
                 },
             )
             response.raise_for_status()
@@ -106,7 +104,7 @@ async def generate_study_plan(user_message: str) -> str:
                 logger.info("Study plan generated via Ollama")
                 return text
     except Exception as exc:
-        logger.warning("Ollama failed for study plan: %s", repr(exc))
+        logger.warning("Ollama failed for study plan: %s", exc)
 
     return (
         "**Sorry, I couldn't generate a study plan right now.** "

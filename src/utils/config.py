@@ -10,11 +10,11 @@ class Settings(BaseSettings):
     ollama_api_url: str = "http://localhost:11434/api/generate"
     ollama_model: str = "mistral"
     scrape_max_pages: int = 5
-    scrape_delay_seconds: float = 4.0        # delay between list-page fetches
-    scrape_detail_delay_seconds: float = 2.0 # delay between detail-page fetches
-    scrape_detail_workers: int = 3           # parallel detail fetches (lower = fewer 429s)
+    scrape_delay_seconds: float = 2.0
+    scrape_detail_delay_seconds: float = 1.0
+    scrape_detail_workers: int = 6
     scrape_detail_timeout_seconds: float = 45.0
-    scrape_enrich_concurrency: int = 3
+    scrape_enrich_concurrency: int = 5
     scrape_pages_per_query: int = 3
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

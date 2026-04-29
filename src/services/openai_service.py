@@ -122,26 +122,24 @@ async def _extract_with_ollama(prompt: str) -> Optional[dict]:
                     "model": settings.ollama_model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "top_p": 0.9,
-                        "num_predict": 500,
-                    },
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 500,
                 }
             )
             response.raise_for_status()
             data = response.json()
             content = data.get("response", "").strip()
-
+            
             if not content:
                 return None
-
+            
             # Extract JSON from response
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0].strip()
             elif "```" in content:
                 content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
+            
             result = json.loads(content)
             return result
     except httpx.ConnectError:
@@ -151,7 +149,7 @@ async def _extract_with_ollama(prompt: str) -> Optional[dict]:
         logger.warning(f"Ollama returned invalid JSON: {e}")
         return None
     except Exception as e:
-        logger.warning(f"Ollama error: {repr(e)}")
+        logger.warning(f"Ollama error: {e}")
         return None
 
 
