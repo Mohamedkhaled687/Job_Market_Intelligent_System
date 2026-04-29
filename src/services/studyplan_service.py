@@ -48,12 +48,11 @@ For each core skill at working proficiency:
 - Summary table: skill → phase → estimated hours
 
 Rules:
-- Use REAL, well-known URLs (official documentation, freeCodeCamp, MDN, Coursera, \
-Udemy, YouTube channels like Traversy Media, Fireship, Tech With Tim, etc.).
-- Do NOT invent or hallucinate URLs. If unsure of a URL, recommend searching for \
-the resource by name instead of providing a fake link.
-- Keep the plan concise but actionable — no filler paragraphs.
-- Tailor the plan to the seniority implied by the input (entry-level vs senior).
+- NEVER guess or hallucinate direct URLs (e.g., do not guess a specific freeCodeCamp article path).
+- To ensure links never break, use **Search Query Links** for all resources.
+- Format: `[Resource Name (Source Name)](https://www.google.com/search?q=source+name+topic+name)`
+- For video content, use: `[Topic Name (YouTube)](https://www.youtube.com/results?search_query=topic+name)`
+- Only use direct URLs for the absolute main domain of official documentation (e.g., https://developer.mozilla.org).
 - Respond ONLY in Markdown. No JSON, no code fences around the whole response.
 """
 
@@ -67,7 +66,7 @@ async def generate_study_plan(user_message: str) -> str:
             client = genai.Client(api_key=settings.google_api_key)
             async with client.aio as aclient:
                 response = await aclient.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-flash-latest",
                     contents=[
                         genai_types.Content(
                             role="user",
