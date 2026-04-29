@@ -48,8 +48,9 @@ For each core skill at working proficiency:
 - Summary table: skill → phase → estimated hours
 
 Rules:
-- Use REAL, direct URLs from well-known platforms (official documentation, MDN, freeCodeCamp, Coursera, YouTube, etc.).
-- Do NOT guess or hallucinate specific article paths. If you are not 100% sure of a direct URL, provide a **Search Query Link** instead: `[Resource Name (YouTube)](https://www.youtube.com/results?search_query=topic+name)` or `[Resource Name (Google)](https://www.google.com/search?q=topic+name)`.
+- Provide DIRECT links to high-quality resources (YouTube videos, official documentation, MDN, freeCodeCamp, etc.).
+- NEVER provide "Search Query" links (e.g., no google.com/search or youtube.com/results links).
+- If you are not 100% sure of a direct URL, simply state the name of the resource and the platform in plain text (e.g., "Watch Traversy Media's JavaScript Crash Course on YouTube").
 - Respond ONLY in Markdown. No JSON, no code fences around the whole response.
 """
 
@@ -61,20 +62,19 @@ async def generate_study_plan(user_message: str) -> str:
     if settings.google_api_key:
         try:
             client = genai.Client(api_key=settings.google_api_key)
-            async with client.aio as aclient:
-                response = await aclient.models.generate_content(
-                    model="gemini-flash-latest",
-                    contents=[
-                        genai_types.Content(
-                            role="user",
-                            parts=[genai_types.Part(text=prompt)],
-                        ),
-                    ],
-                    config=genai_types.GenerateContentConfig(
-                        temperature=0.4,
-                        max_output_tokens=4096,
+            response = await client.aio.models.generate_content(
+                model="gemini-flash-latest",
+                contents=[
+                    genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part(text=prompt)],
                     ),
-                )
+                ],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.4,
+                    max_output_tokens=4096,
+                ),
+            )
             logger.info("Study plan generated via Gemini")
             return response.text.strip()
         except Exception as exc:

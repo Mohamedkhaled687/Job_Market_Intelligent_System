@@ -159,15 +159,14 @@ async def _extract_with_gemini(prompt: str, api_key: str) -> Optional[dict]:
     """Extract using Google Gemini API."""
     try:
         client = genai.Client(api_key=api_key)
-        async with client.aio as aclient:
-            response = await aclient.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=500,
-                ),
-            )
+        response = await client.aio.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.1,
+                max_output_tokens=500,
+            ),
+        )
         content = response.text.strip()
         if content.startswith("```"):
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
