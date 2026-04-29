@@ -48,11 +48,8 @@ For each core skill at working proficiency:
 - Summary table: skill → phase → estimated hours
 
 Rules:
-- NEVER guess or hallucinate direct URLs (e.g., do not guess a specific freeCodeCamp article path).
-- To ensure links never break, use **Search Query Links** for all resources.
-- Format: `[Resource Name (Source Name)](https://www.google.com/search?q=source+name+topic+name)`
-- For video content, use: `[Topic Name (YouTube)](https://www.youtube.com/results?search_query=topic+name)`
-- Only use direct URLs for the absolute main domain of official documentation (e.g., https://developer.mozilla.org).
+- Use REAL, direct URLs from well-known platforms (official documentation, MDN, freeCodeCamp, Coursera, YouTube, etc.).
+- Do NOT guess or hallucinate specific article paths. If you are not 100% sure of a direct URL, provide a **Search Query Link** instead: `[Resource Name (YouTube)](https://www.youtube.com/results?search_query=topic+name)` or `[Resource Name (Google)](https://www.google.com/search?q=topic+name)`.
 - Respond ONLY in Markdown. No JSON, no code fences around the whole response.
 """
 
