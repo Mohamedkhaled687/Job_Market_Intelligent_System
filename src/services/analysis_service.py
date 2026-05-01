@@ -1,16 +1,12 @@
 """
 Data Analysis Service
-Implements Regression and Classification Analysis.
+Implements Regression and Classification Analysis as per Lecture 4.
 """
 
 import numpy as np
 from typing import Dict, List, Any, Optional
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -20,6 +16,7 @@ from src.models.database import get_db
 class SalaryRegressionService:
     """
     Implements Linear Regression for Salary Prediction.
+    Formula: Y = a0 + a1X + ε
     """
 
     @staticmethod
@@ -77,9 +74,9 @@ class JobClassificationService:
     """
 
     @staticmethod
-    async def compare_classifiers(target_field: str = "category") -> Dict:
+    async def get_model_accuracy(target_field: str = "category") -> Dict:
         """
-        Compares different classifiers: Logistic Regression, SVM, KNN, Decision Tree, Random Forest, Naive Bayes.
+        Calculates accuracy using Random Forest classifier.
         """
         db = get_db()
         jobs = await db.jobs.find(
@@ -88,7 +85,7 @@ class JobClassificationService:
         ).to_list(length=1000)
 
         if len(jobs) < 50:
-            return {"error": "Insufficient data for classification comparison"}
+            return {"error": "Insufficient data for classification"}
 
         # Vectorize skills
         job_texts = [" ".join(job.get("normalized_skills", [])) for job in jobs]
@@ -102,42 +99,15 @@ class JobClassificationService:
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        results = {}
-
-        # 1. Logistic Regression
-        lr = LogisticRegression(max_iter=1000)
-        lr.fit(X_train, y_train)
-        results["Logistic Regression"] = lr.score(X_test, y_test)
-
-        # 2. Support Vector Machines (SVM)
-        svm = SVC()
-        svm.fit(X_train, y_train)
-        results["SVM"] = svm.score(X_test, y_test)
-
-        # 3. K-Nearest Neighbors (KNN)
-        knn = KNeighborsClassifier(n_neighbors=5)
-        knn.fit(X_train, y_train)
-        results["KNN"] = knn.score(X_test, y_test)
-
-        # 4. Decision Tree
-        dt = DecisionTreeClassifier()
-        dt.fit(X_train, y_train)
-        results["Decision Tree"] = dt.score(X_test, y_test)
-
-        # 5. Random Forest
+        # Random Forest
         rf = RandomForestClassifier()
         rf.fit(X_train, y_train)
-        results["Random Forest"] = rf.score(X_test, y_test)
-
-        # 6. Naive Bayes
-        nb = GaussianNB()
-        nb.fit(X_train, y_train)
-        results["Naive Bayes"] = nb.score(X_test, y_test)
+        accuracy = rf.score(X_test, y_test)
 
         return {
             "target": target_field,
-            "accuracy_comparison": {k: round(v, 4) for k, v in results.items()},
-            "best_model": max(results, key=results.get),
+            "model": "Random Forest",
+            "accuracy": round(accuracy, 4),
             "sample_size": len(jobs)
         }
 
