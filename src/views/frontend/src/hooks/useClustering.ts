@@ -13,6 +13,18 @@ export interface SkillClusteringData {
   clusters: SkillCluster[];
   job_count: number;
   unique_skill_count: number;
+  k?: number;
+  wss?: number;
+  silhouette_score?: number;
+  plot_points?: Array<{
+    title: string;
+    company: string;
+    skills: string[];
+    category: string;
+    x: number;
+    y: number;
+    cluster: number;
+  }>;
 }
 
 export interface CompanyHiringPattern {
@@ -123,5 +135,37 @@ export const useCategoryHiringTrends = () => {
       return response.data;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
+  });
+};
+
+/**
+ * Hook to fetch K-Means clustering results
+ */
+export const useKMeansClustering = (k: number = 5) => {
+  return useQuery({
+    queryKey: ['kmeansClustering', k],
+    queryFn: async () => {
+      const response = await apiClient.get<SkillClusteringData>(
+        `/api/insights/kmeans-clustering?k=${k}`
+      );
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 60,
+  });
+};
+
+/**
+ * Hook to fetch Elbow Method data
+ */
+export const useElbowData = () => {
+  return useQuery({
+    queryKey: ['elbowData'],
+    queryFn: async () => {
+      const response = await apiClient.get<{ elbow_data: Array<{ k: number; wss: number }> }>(
+        '/api/insights/elbow-method'
+      );
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 60,
   });
 };

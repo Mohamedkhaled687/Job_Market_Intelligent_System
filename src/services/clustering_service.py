@@ -174,25 +174,57 @@ class SkillClusteringService:
         return clusters[:10]  # Return top 10 clusters
 
     @staticmethod
-    async def cluster_jobs_kmeans(k: int = 5) -> Dict:
+    async def get_elbow_data(max_k: int = 10) -> Dict:
         """
-        K-Means Clustering implementation as per Lecture 4.
-        1. Pick K value.
-        2. Pick random K points as initial centroids.
-        3. Calculate nearest centroid (Euclidean distance).
-        4. Re-assign centroids.
-        5. Repeat until convergence.
-        6. Calculate WSS (Within-Cluster Sum of Squares).
+        Calculate WSS (Within-Cluster Sum of Squares) for different K values
+        to help identify the 'elbow' point.
         """
         db = get_db()
-        jobs = await db.jobs.find({}, {"normalized_skills": 1, "job_title": 1, "company": 1}).to_list(length=1000)
+        jobs = await db.jobs.find({}, {"normalized_skills": 1}).to_list(length=1000)
         
         if not jobs:
             return {"error": "No jobs found"}
 
-        # Prepare data: skills as text
-        job_texts = [" ".join(job.get("normalized_skills", [])) for job in jobs]
+        job_texts = [" ".join(job.get("normalized_skills", [])) for job in jobs if job.get("normalized_skills")]
+        if not job_texts:
+            return {"error": "No jobs with skills found"}
+
+        vectorizer = TfidfVectorizer(max_features=100)
+        X = vectorizer.fit_transform(job_texts).toarray()
+
+        elbow_data = []
+        for k in range(2, max_k + 1):
+            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+            kmeans.fit(X)
+            elbow_data.append({
+                "k": k,
+                "wss": float(kmeans.inertia_)
+            })
+
+        return {"elbow_data": elbow_data}
+
+    @staticmethod
+    async def cluster_jobs_kmeans(k: int = 5) -> Dict:
+        """
+        Enhanced K-Means Clustering implementation.
+        Includes Silhouette scores and PCA for visualization.
+        """
+        from sklearn.metrics import silhouette_score
+        from sklearn.decomposition import PCA
+
+        db = get_db()
+        jobs = await db.jobs.find({}, {"normalized_skills": 1, "job_title": 1, "company": 1, "category": 1}).to_list(length=1000)
         
+        if not jobs:
+            return {"error": "No jobs found"}
+
+        # Prepare data
+        valid_jobs = [j for j in jobs if j.get("normalized_skills")]
+        job_texts = [" ".join(j.get("normalized_skills", [])) for j in valid_jobs]
+        
+        if not job_texts:
+            return {"error": "Insufficient data with skills"}
+
         # Vectorize
         vectorizer = TfidfVectorizer(max_features=100)
         X = vectorizer.fit_transform(job_texts).toarray()
@@ -201,19 +233,34 @@ class SkillClusteringService:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         kmeans.fit(X)
         
-        # WSS (Inertia in sklearn)
-        wss = kmeans.inertia_
+        # Calculate Silhouette Score
+        sil_score = silhouette_score(X, kmeans.labels_)
+
+        # Dimensionality Reduction for Visualization (PCA to 2D)
+        pca = PCA(n_components=2)
+        X_2d = pca.fit_transform(X)
 
         # Group jobs by cluster
         clusters = defaultdict(list)
-        for idx, label in enumerate(kmeans.labels_):
-            clusters[int(label)].append({
-                "title": jobs[idx].get("job_title"),
-                "company": jobs[idx].get("company"),
-                "skills": jobs[idx].get("normalized_skills")
-            })
+        plot_points = []
 
-        # Get top skills per cluster
+        for idx, label in enumerate(kmeans.labels_):
+            job = valid_jobs[idx]
+            cluster_id = int(label)
+            
+            job_data = {
+                "title": job.get("job_title"),
+                "company": job.get("company"),
+                "skills": job.get("normalized_skills"),
+                "category": job.get("category"),
+                "x": float(X_2d[idx][0]),
+                "y": float(X_2d[idx][1])
+            }
+            
+            clusters[cluster_id].append(job_data)
+            plot_points.append({**job_data, "cluster": cluster_id})
+
+        # Get top skills and descriptive names per cluster
         cluster_summaries = []
         for i in range(k):
             cluster_jobs = clusters[i]
@@ -221,19 +268,28 @@ class SkillClusteringService:
             for j in cluster_jobs:
                 all_cluster_skills.extend(j["skills"] or [])
             
-            top_skills = Counter(all_cluster_skills).most_common(5)
+            top_skills_counts = Counter(all_cluster_skills).most_common(5)
+            top_skills = [s[0] for s in top_skills_counts]
+            
+            # Generate a cluster name from top skills
+            cluster_name = " & ".join([s.title() for s in top_skills[:2]]) + " Experts"
+            
             cluster_summaries.append({
                 "cluster_id": i,
+                "name": cluster_name,
                 "count": len(cluster_jobs),
-                "top_skills": [s[0] for s in top_skills],
-                "sample_jobs": cluster_jobs[:3]
+                "top_skills": top_skills,
+                "sample_jobs": cluster_jobs[:5]
             })
 
         return {
             "k": k,
-            "wss": wss,
-            "clusters": cluster_summaries
+            "wss": float(kmeans.inertia_),
+            "silhouette_score": float(sil_score),
+            "clusters": cluster_summaries,
+            "plot_points": plot_points[:200]  # Return limited points for frontend performance
         }
+
 
 
 class CompanyHiringAnalysisService:
