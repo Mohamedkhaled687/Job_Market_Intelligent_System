@@ -11,9 +11,9 @@ const NAV_ITEMS = [
   { to: "/", label: "Home", icon: Home },
   { to: "/jobs", label: "Jobs", icon: Briefcase },
   { to: "/dashboard", label: "Analytics", icon: BarChart3 },
+  { to: "/insights/clustering", label: "Clustering", icon: Layers },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/salary", label: "Salary", icon: DollarSign },
-  { to: "/insights/clustering", label: "Clustering", icon: Layers },
 ];
 
 const THEME_OPTIONS = [

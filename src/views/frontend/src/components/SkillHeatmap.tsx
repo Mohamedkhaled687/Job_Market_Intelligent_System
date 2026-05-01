@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 interface SkillHeatmapProps {
   skills: string[];
@@ -43,15 +44,15 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
   }, [heatmapData]);
 
   const getColor = (value: number): string => {
-    if (value === 0) return '#f3f4f6';
-    if (maxValue <= 0) return '#f3f4f6';
+    if (value === 0) return 'hsl(var(--muted))';
+    if (maxValue <= 0) return 'hsl(var(--muted))';
     const intensity = value / maxValue;
 
-    if (intensity < 0.25) return '#dcfce7';
-    if (intensity < 0.5) return '#86efac';
-    if (intensity < 0.75) return '#22c55e';
-    if (intensity < 0.9) return '#16a34a';
-    return '#15803d';
+    if (intensity < 0.25) return 'hsl(142 55% 85%)';
+    if (intensity < 0.5) return 'hsl(142 55% 70%)';
+    if (intensity < 0.75) return 'hsl(142 55% 55%)';
+    if (intensity < 0.9) return 'hsl(142 60% 42%)';
+    return 'hsl(142 65% 32%)';
   };
 
   const topPadding = 120;
@@ -59,12 +60,12 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
 
   if (!displaySkills.length || !displayHeatmap.length) {
     return (
-      <div className="w-full flex flex-col items-center p-6 bg-white rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">{title}</h2>
-        <p className="text-sm text-gray-600 mb-6">
+      <div className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
+        <h2 className="mb-2 text-xl font-semibold text-[hsl(var(--foreground))]">{title}</h2>
+        <p className="mb-6 text-sm text-[hsl(var(--muted-foreground))]">
           Shows skill co-occurrence frequency (darker = more frequently required together)
         </p>
-        <div className="w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center text-gray-600">
+        <div className="w-full rounded-lg border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.4] px-6 py-12 text-center text-[hsl(var(--muted-foreground))]">
           No skill clustering data available for the selected filters.
         </div>
       </div>
@@ -72,23 +73,19 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
   }
 
   return (
-    <div className="w-full flex flex-col items-center p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">{title}</h2>
-      <p className="text-sm text-gray-600 mb-6">
+    <div className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
+      <h2 className="mb-2 text-xl font-semibold text-[hsl(var(--foreground))]">{title}</h2>
+      <p className="mb-6 text-sm text-[hsl(var(--muted-foreground))]">
         Shows skill co-occurrence frequency (darker = more frequently required together)
       </p>
-
-      <svg
-        width={width + leftPadding}
-        height={height + topPadding}
-        className="border border-gray-300 bg-gray-50"
-      >
+      <div className="w-full overflow-x-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] p-3">
+      <svg width={width + leftPadding} height={height + topPadding}>
         {/* Title */}
         <text
           x={(width + leftPadding) / 2}
           y={30}
           textAnchor="middle"
-          className="text-sm font-semibold fill-gray-700"
+          className="text-sm font-semibold fill-[hsl(var(--foreground))]"
         >
           Skill Combinations Matrix
         </text>
@@ -100,7 +97,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
               x={leftPadding - 10}
               y={topPadding + i * cellSize + cellSize / 2 + 4}
               textAnchor="end"
-              className="text-xs fill-gray-600"
+              className="text-xs fill-[hsl(var(--muted-foreground))]"
               style={{ fontSize: '11px' }}
             >
               {skill}
@@ -111,7 +108,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
               y1={topPadding + i * cellSize}
               x2={leftPadding + width - leftPadding}
               y2={topPadding + i * cellSize}
-              stroke="#e5e7eb"
+              stroke="hsl(var(--border))"
               strokeWidth="1"
             />
           </g>
@@ -124,7 +121,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
               x={leftPadding + i * cellSize + cellSize / 2}
               y={topPadding - 10}
               textAnchor="middle"
-              className="text-xs fill-gray-600"
+              className="text-xs fill-[hsl(var(--muted-foreground))]"
               style={{
                 fontSize: '11px',
                 transform: `rotate(-45deg)`,
@@ -139,7 +136,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
               y1={topPadding}
               x2={leftPadding + i * cellSize}
               y2={topPadding + height - topPadding}
-              stroke="#e5e7eb"
+              stroke="hsl(var(--border))"
               strokeWidth="1"
             />
           </g>
@@ -155,7 +152,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
                 width={cellSize}
                 height={cellSize}
                 fill={getColor(value)}
-                stroke="#d1d5db"
+                stroke="hsl(var(--border))"
                 strokeWidth="0.5"
               />
               {value > 0 && cellSize > 15 && (
@@ -163,7 +160,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
                   x={leftPadding + j * cellSize + cellSize / 2}
                   y={topPadding + i * cellSize + cellSize / 2 + 3}
                   textAnchor="middle"
-                  className="text-xs font-semibold fill-gray-700"
+                  className="text-xs font-semibold fill-[hsl(var(--foreground))]"
                   style={{ fontSize: cellSize < 25 ? '8px' : '10px' }}
                 >
                   {value}
@@ -173,38 +170,39 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
           ))
         )}
       </svg>
+      </div>
 
       {/* Legend */}
-      <div className="mt-6 flex items-center gap-4">
-        <span className="text-sm font-medium text-gray-700">Frequency:</span>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-[hsl(var(--foreground))]">Frequency:</span>
         <div className="flex gap-2">
           {[
-            { label: '0', color: '#f3f4f6' },
-            { label: 'Low', color: '#dcfce7' },
-            { label: 'Medium', color: '#86efac' },
-            { label: 'High', color: '#22c55e' },
-            { label: 'Very High', color: '#15803d' },
+            { label: '0', color: 'hsl(var(--muted))' },
+            { label: 'Low', color: 'hsl(142 55% 85%)' },
+            { label: 'Medium', color: 'hsl(142 55% 70%)' },
+            { label: 'High', color: 'hsl(142 55% 55%)' },
+            { label: 'Very High', color: 'hsl(142 65% 32%)' },
           ].map(({ label, color }) => (
             <div key={label} className="flex items-center gap-1">
               <div
-                className="w-4 h-4 border border-gray-300"
+                className="h-4 w-4 border border-[hsl(var(--border))]"
                 style={{ backgroundColor: color }}
               />
-              <span className="text-xs text-gray-600">{label}</span>
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">{label}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-        <div className="bg-blue-50 p-3 rounded">
-          <p className="text-gray-600">Skills Analyzed</p>
-          <p className="text-xl font-bold text-blue-600">{displaySkills.length}</p>
+      <div className="mt-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] p-3">
+          <p className="text-[hsl(var(--muted-foreground))]">Skills Analyzed</p>
+          <p className="text-xl font-bold text-[hsl(var(--foreground))]">{displaySkills.length}</p>
         </div>
-        <div className="bg-green-50 p-3 rounded">
-          <p className="text-gray-600">Max Co-occurrence</p>
-          <p className="text-xl font-bold text-green-600">{maxValue}</p>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] p-3">
+          <p className="text-[hsl(var(--muted-foreground))]">Max Co-occurrence</p>
+          <p className="text-xl font-bold text-[hsl(var(--foreground))]">{maxValue}</p>
         </div>
       </div>
     </div>
@@ -226,10 +224,10 @@ export const SkillClusterCard: React.FC<SkillClusterProps> = ({
   strength,
 }) => {
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+    <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-bold text-blue-900">{name}</h3>
-        <span className="bg-blue-200 text-blue-900 text-xs px-2 py-1 rounded">
+        <h3 className="font-bold text-[hsl(var(--foreground))]">{name}</h3>
+        <span className="rounded bg-[hsl(var(--primary))/0.15] px-2 py-1 text-xs text-[hsl(var(--primary))]">
           Strength: {strength}
         </span>
       </div>
@@ -237,7 +235,10 @@ export const SkillClusterCard: React.FC<SkillClusterProps> = ({
         {skills.map((skill) => (
           <span
             key={skill}
-            className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full"
+            className={cn(
+              "rounded-full px-3 py-1 text-xs",
+              "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+            )}
           >
             {skill}
           </span>

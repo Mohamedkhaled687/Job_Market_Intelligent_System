@@ -6,14 +6,19 @@ Implements skill-based clustering and company hiring pattern analysis
 import logging
 from typing import Optional, List, Dict, Any
 from collections import defaultdict, Counter
-import numpy as np
-import pandas as pd
-from sklearn.cluster import KMeans
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import StandardScaler
+try:
+    from sklearn.cluster import KMeans
+    from sklearn.feature_extraction.text import TfidfVectorizer
+except ModuleNotFoundError:  # pragma: no cover - environment-dependent
+    KMeans = None
+    TfidfVectorizer = None
 from src.models.database import get_db
 
 logger = logging.getLogger(__name__)
+
+
+def _sklearn_available() -> bool:
+    return KMeans is not None and TfidfVectorizer is not None
 
 
 class SkillClusteringService:
@@ -84,7 +89,8 @@ class SkillClusteringService:
         job_skills = []
 
         for job in jobs:
-            skills = job.get("normalized_skills") or []
+            # Deduplicate skills per job so co-occurrence counts are not inflated.
+            skills = sorted(set(job.get("normalized_skills") or []))
             job_skills.append(skills)
             all_skills.extend(skills)
 
@@ -161,7 +167,7 @@ class SkillClusteringService:
             for j, other_skill in enumerate(skills):
                 if other_skill not in visited:
                     co_count = heatmap[i][j]
-                    if co_count > 3:  # Threshold for similarity
+                    if co_count >= 2:  # Threshold for similarity
                         cluster["skills"].append(other_skill)
                         cluster["strength"] += co_count
                         visited.add(other_skill)
@@ -169,8 +175,8 @@ class SkillClusteringService:
             if len(cluster["skills"]) > 1:
                 clusters.append(cluster)
 
-        # Sort by strength
-        clusters.sort(key=lambda x: x["strength"], reverse=True)
+        # Deterministic sorting by strongest cluster then cluster seed name.
+        clusters.sort(key=lambda x: (-x["strength"], x["name"]))
         return clusters[:10]  # Return top 10 clusters
 
     @staticmethod
@@ -184,6 +190,12 @@ class SkillClusteringService:
         5. Repeat until convergence.
         6. Calculate WSS (Within-Cluster Sum of Squares).
         """
+        if not _sklearn_available():
+            return {
+                "error": "scikit-learn is not installed in this environment",
+                "hint": "Install with: pip install scikit-learn",
+            }
+
         db = get_db()
         jobs = await db.jobs.find({}, {"normalized_skills": 1, "title": 1, "company": 1}).to_list(length=1000)
 

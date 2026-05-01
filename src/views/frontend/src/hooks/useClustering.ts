@@ -13,6 +13,8 @@ export interface SkillClusteringData {
   clusters: SkillCluster[];
   job_count: number;
   unique_skill_count: number;
+  message?: string;
+  error?: string;
 }
 
 export interface CompanyHiringPattern {
@@ -27,6 +29,8 @@ export interface CompanyHiringPattern {
 export interface CompanyHiringData {
   companies: CompanyHiringPattern[];
   total_companies_analyzed: number;
+  message?: string;
+  error?: string;
 }
 
 export interface CompanySkillMatrix {
@@ -46,7 +50,27 @@ export interface CategoryTrend {
 export interface CategoryTrendData {
   category_trends: CategoryTrend[];
   total_categories: number;
+  message?: string;
+  error?: string;
 }
+
+const DEFAULT_SKILL_CLUSTERING_DATA: SkillClusteringData = {
+  skills: [],
+  heatmap: [],
+  clusters: [],
+  job_count: 0,
+  unique_skill_count: 0,
+};
+
+const DEFAULT_COMPANY_HIRING_DATA: CompanyHiringData = {
+  companies: [],
+  total_companies_analyzed: 0,
+};
+
+const DEFAULT_CATEGORY_TREND_DATA: CategoryTrendData = {
+  category_trends: [],
+  total_categories: 0,
+};
 
 /**
  * Hook to fetch skill clustering data with heatmap
@@ -56,23 +80,35 @@ export const useSkillClustering = (
   category?: string,
   seniority?: string
 ) => {
+  const normalizedMinSkillFrequency = Math.max(1, Math.min(10, Math.floor(minSkillFrequency)));
+  const normalizedCategory = category?.trim() || undefined;
+  const normalizedSeniority = seniority?.trim() || undefined;
+
   return useQuery({
     queryKey: [
       'skillClustering',
-      minSkillFrequency,
-      category,
-      seniority,
+      normalizedMinSkillFrequency,
+      normalizedCategory ?? 'all',
+      normalizedSeniority ?? 'all',
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('min_skill_frequency', minSkillFrequency.toString());
-      if (category) params.append('category', category);
-      if (seniority) params.append('seniority', seniority);
+      params.append('min_skill_frequency', normalizedMinSkillFrequency.toString());
+      if (normalizedCategory) params.append('category', normalizedCategory);
+      if (normalizedSeniority) params.append('seniority', normalizedSeniority);
 
       const response = await apiClient.get<SkillClusteringData>(
         `/api/insights/skill-clustering?${params}`
       );
-      return response.data;
+      return {
+        ...DEFAULT_SKILL_CLUSTERING_DATA,
+        ...response.data,
+        skills: response.data?.skills ?? [],
+        heatmap: response.data?.heatmap ?? [],
+        clusters: response.data?.clusters ?? [],
+        job_count: response.data?.job_count ?? 0,
+        unique_skill_count: response.data?.unique_skill_count ?? 0,
+      } satisfies SkillClusteringData;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });
@@ -88,7 +124,12 @@ export const useCompanyHiringPatterns = () => {
       const response = await apiClient.get<CompanyHiringData>(
         '/api/insights/company-hiring-patterns'
       );
-      return response.data;
+      return {
+        ...DEFAULT_COMPANY_HIRING_DATA,
+        ...response.data,
+        companies: response.data?.companies ?? [],
+        total_companies_analyzed: response.data?.total_companies_analyzed ?? 0,
+      } satisfies CompanyHiringData;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });
@@ -120,7 +161,12 @@ export const useCategoryHiringTrends = () => {
       const response = await apiClient.get<CategoryTrendData>(
         '/api/insights/category-hiring-trends'
       );
-      return response.data;
+      return {
+        ...DEFAULT_CATEGORY_TREND_DATA,
+        ...response.data,
+        category_trends: response.data?.category_trends ?? [],
+        total_categories: response.data?.total_categories ?? 0,
+      } satisfies CategoryTrendData;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });

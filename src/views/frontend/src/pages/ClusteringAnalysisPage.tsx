@@ -1,124 +1,129 @@
 import React, { useState } from 'react';
+import { Layers, Filter, RefreshCw, AlertCircle } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
 import { SkillHeatmap, SkillClusterCard } from '../components/SkillHeatmap';
 import {
   CompanyHiringAnalysis,
-  CategoryTrendAnalysis,
 } from '../components/CompanyHiringAnalysis';
 import {
   useSkillClustering,
   useCompanyHiringPatterns,
-  useCategoryHiringTrends,
 } from '../hooks/useClustering';
 
-/**
- * Advanced analytics page for clustering and big data analysis
- * Features:
- * - Skill co-occurrence heatmap and clustering
- * - Company hiring patterns analysis
- * - Category-based hiring trends
- */
 export const ClusteringAnalysisPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [minFrequency, setMinFrequency] = useState(2);
+  const [minFrequency, setMinFrequency] = useState(3);
 
   const skillClustering = useSkillClustering(minFrequency, selectedCategory);
   const companyPatterns = useCompanyHiringPatterns();
-  const categoryTrends = useCategoryHiringTrends();
 
   const categories = [
-    'backend',
-    'frontend',
-    'fullstack',
-    'data',
-    'devops',
-    'mobile',
-    'ai',
-    'qa',
-    'design',
-    'management',
-    'cybersecurity',
+    'backend', 'frontend', 'fullstack', 'data', 'devops', 'mobile',
+    'ai', 'qa', 'design', 'management', 'cybersecurity',
   ];
 
   const hasSkillData = (skillClustering.data?.skills?.length ?? 0) > 0;
   const hasCompanyData = (companyPatterns.data?.companies?.length ?? 0) > 0;
-  const hasCategoryData = (categoryTrends.data?.category_trends?.length ?? 0) > 0;
+  const apiMessage = skillClustering.data?.message || skillClustering.data?.error;
 
   const clearFilters = () => {
     setSelectedCategory(undefined);
+    setMinFrequency(3);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-8 px-6">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-bold mb-2">Clustering & Big Data Analysis</h1>
-          <p className="text-blue-100">
-            Discover skill patterns, company hiring preferences, and market trends
-          </p>
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-[hsl(var(--border))] bg-gradient-to-r from-[hsl(var(--card))] to-[hsl(var(--muted))/0.4] px-6 py-8">
+        <div className="flex items-start gap-4">
+          <div className="rounded-xl bg-[hsl(var(--primary))/0.15] p-3 text-[hsl(var(--primary))]">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">Clustering Analysis</h1>
+            <p className="mt-1 text-[hsl(var(--muted-foreground))]">
+              Explore skill co-occurrence, company hiring behavior, and category trends.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Filters */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Filters</h2>
+      <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Filters</h2>
+          </div>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 rounded-lg border border-[hsl(var(--border))] px-3 py-1.5 text-sm text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Job Category
-              </label>
-              <select
-                value={selectedCategory || ''}
-                onChange={(e) => setSelectedCategory(e.target.value || undefined)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-[hsl(var(--muted-foreground))]">
+              Job Category
+            </label>
+            <select
+              value={selectedCategory || ''}
+              onChange={(e) => setSelectedCategory(e.target.value || undefined)}
+              className="w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))/0.2]"
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Frequency Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Min. Skill Frequency
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={minFrequency}
-                onChange={(e) => setMinFrequency(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>1</span>
-                <span>Current: {minFrequency}</span>
-                <span>10</span>
-              </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-[hsl(var(--muted-foreground))]">
+              Min. Skill Frequency
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={minFrequency}
+              onChange={(e) => setMinFrequency(parseInt(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[hsl(var(--muted))] accent-[hsl(var(--primary))]"
+            />
+            <div className="mt-1 flex justify-between text-xs text-[hsl(var(--muted-foreground))]">
+              <span>1</span>
+              <span>Current: {minFrequency}</span>
+              <span>10</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Skill Clustering Section */}
-        <div className="bg-white p-6 rounded-lg shadow">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard label="Jobs Analyzed" value={(skillClustering.data?.job_count ?? 0).toLocaleString()} />
+        <StatCard label="Unique Skills" value={(skillClustering.data?.unique_skill_count ?? 0).toString()} />
+        <StatCard label="Top Companies" value={(companyPatterns.data?.total_companies_analyzed ?? 0).toString()} />
+      </div>
+
+      {apiMessage && (
+        <div className="flex items-start gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.4] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{apiMessage}</span>
+        </div>
+      )}
+
+      <div className="space-y-8">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
           {skillClustering.isLoading ? (
-            <Skeleton className="w-full h-96" />
+            <Skeleton className="h-[420px] w-full" />
           ) : skillClustering.error ? (
-            <div className="text-center py-8 text-red-600">
-              Error loading skill clustering data
-            </div>
+            <InlineError text="Error loading skill clustering data." />
           ) : hasSkillData ? (
             <>
-              {/* Heatmap */}
               <SkillHeatmap
                 skills={skillClustering.data?.skills || []}
                 heatmapData={skillClustering.data?.heatmap || []}
@@ -126,121 +131,91 @@ export const ClusteringAnalysisPage: React.FC = () => {
                 width={900}
                 height={600}
               />
-
-              {/* Clusters */}
               <div className="mt-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">
-                  Identified Skill Clusters
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 className="mb-3 text-xl font-semibold text-[hsl(var(--foreground))]">Identified Skill Clusters</h3>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {(skillClustering.data?.clusters || []).map((cluster, idx) => (
-                    <SkillClusterCard
-                      key={idx}
-                      name={cluster.name}
-                      skills={cluster.skills}
-                      strength={cluster.strength}
-                    />
+                    <SkillClusterCard key={idx} name={cluster.name} skills={cluster.skills} strength={cluster.strength} />
                   ))}
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded">
-                  <p className="text-gray-600 text-sm">Total Jobs Analyzed</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {skillClustering.data?.job_count?.toLocaleString() || 0}
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded">
-                  <p className="text-gray-600 text-sm">Unique Skills</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {skillClustering.data?.unique_skill_count || 0}
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded">
-                  <p className="text-gray-600 text-sm">Skill Clusters</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {(skillClustering.data?.clusters || []).length}
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded">
-                  <p className="text-gray-600 text-sm">Analysis Date</p>
-                  <p className="text-xl font-bold text-orange-600">Today</p>
                 </div>
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No skill clustering data available for the selected filters
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Try a broader category or clear the filters to analyze the full job set.
-              </p>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
-                Clear filters
-              </button>
-            </div>
+            <EmptyState
+              title="No skill clustering data for these filters"
+              description="Try reducing the minimum frequency or clear category filters to include more jobs."
+              onReset={clearFilters}
+            />
           )}
         </div>
 
-        {/* Company Hiring Patterns Section */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
           {companyPatterns.isLoading ? (
-            <Skeleton className="w-full h-96" />
+            <Skeleton className="h-[320px] w-full" />
           ) : companyPatterns.error ? (
-            <div className="text-center py-8 text-red-600">
-              Error loading company data
-            </div>
+            <InlineError text="Error loading company hiring data." />
           ) : hasCompanyData ? (
             <CompanyHiringAnalysis companies={companyPatterns.data?.companies || []} />
           ) : (
-            <div className="text-center py-8 text-gray-600">
-              No company data available
-            </div>
+            <EmptyState title="No company data available" description="No company records were found for the current selection." />
           )}
         </div>
 
-        {/* Category Trends Section */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          {categoryTrends.isLoading ? (
-            <Skeleton className="w-full h-96" />
-          ) : categoryTrends.error ? (
-            <div className="text-center py-8 text-red-600">
-              Error loading category trends
-            </div>
-          ) : hasCategoryData ? (
-            <CategoryTrendAnalysis trends={categoryTrends.data?.category_trends || []} />
-          ) : (
-            <div className="text-center py-8 text-gray-600">
-              No category data available
-            </div>
-          )}
-        </div>
-
-        {/* Insights Section */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg border border-green-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">📊 Key Insights</h2>
-          <ul className="space-y-2 text-gray-700">
-            <li>
-              • Skills often required together form natural career paths (e.g.,
-              frontend stack)
-            </li>
-            <li>
-              • Top companies have distinct skill preferences and hiring patterns
-            </li>
-            <li>• Backend and AI roles have higher average salaries</li>
-            <li>• Most opportunities are for mid-level and senior positions</li>
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] p-6">
+          <h2 className="mb-3 text-xl font-semibold text-[hsl(var(--foreground))]">Key Reading Guide</h2>
+          <ul className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <li>- Darker cells in heatmap mean stronger skill co-occurrence.</li>
+            <li>- Cluster cards summarize skills that commonly appear together in job posts.</li>
+            <li>- Company blocks show who is hiring most and what they prioritize.</li>
+            <li>- Category trends compare demand size, average salary, and hiring breadth.</li>
           </ul>
         </div>
       </div>
     </div>
   );
 };
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+      <p className="text-xs text-[hsl(var(--muted-foreground))]">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-[hsl(var(--foreground))]">{value}</p>
+    </div>
+  );
+}
+
+function InlineError({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-400">
+      {text}
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+  onReset,
+}: {
+  title: string;
+  description: string;
+  onReset?: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] px-6 py-10 text-center">
+      <h3 className="mb-1 text-lg font-semibold text-[hsl(var(--foreground))]">{title}</h3>
+      <p className="mb-4 text-sm text-[hsl(var(--muted-foreground))]">{description}</p>
+      {onReset && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2 text-sm font-medium text-[hsl(var(--primary-foreground))] hover:opacity-90"
+        >
+          Reset filters
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default ClusteringAnalysisPage;
