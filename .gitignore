@@ -47,7 +47,3 @@ report/*
 
 # Data files 
 data/*
-
-# Local logs and scripts
-backend.log.err
-restart.ps1
