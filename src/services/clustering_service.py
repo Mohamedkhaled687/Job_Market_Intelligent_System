@@ -60,7 +60,7 @@ class SkillClusteringService:
                 "$project": {
                     "_id": 1,
                     "normalized_skills": 1,
-                    "job_title": 1,
+                    "title": 1,
                     "company": 1,
                     "category": 1,
                 }
@@ -185,7 +185,7 @@ class SkillClusteringService:
         6. Calculate WSS (Within-Cluster Sum of Squares).
         """
         db = get_db()
-        jobs = await db.jobs.find({}, {"normalized_skills": 1, "job_title": 1, "company": 1}).to_list(length=1000)
+        jobs = await db.jobs.find({}, {"normalized_skills": 1, "title": 1, "company": 1}).to_list(length=1000)
 
         if not jobs:
             return {"error": "No jobs found"}
@@ -208,7 +208,7 @@ class SkillClusteringService:
         clusters = defaultdict(list)
         for idx, label in enumerate(kmeans.labels_):
             clusters[int(label)].append({
-                "title": jobs[idx].get("job_title"),
+                "title": jobs[idx].get("title"),
                 "company": jobs[idx].get("company"),
                 "skills": jobs[idx].get("normalized_skills")
             })

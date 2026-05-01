@@ -2,6 +2,7 @@ from collections import Counter
 from typing import Optional
 
 from src.models.database import get_db
+from src.services.clustering_service import SkillClusteringService, CompanyHiringAnalysisService
 
 
 async def get_dashboard(
@@ -328,6 +329,7 @@ async def get_salary_intelligence(
         )
         comparison_mode = "category_market_overview"
 
+
     return {
         "percentiles": {"p25": p25, "p50": p50, "p75": p75, "p90": p90},
         "distribution": distribution,
@@ -338,3 +340,28 @@ async def get_salary_intelligence(
         "count": n,
         "avg": round(sum(salaries) / n),
     }
+
+
+async def get_skill_clustering(
+    min_skill_frequency: int = 5,
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+) -> dict:
+    return await SkillClusteringService.cluster_jobs_by_skills(
+        min_skill_frequency=min_skill_frequency,
+        category=category,
+        seniority=seniority,
+    )
+
+
+async def get_company_hiring_patterns() -> dict:
+    return await CompanyHiringAnalysisService.get_company_hiring_patterns()
+
+
+async def get_company_skill_matrix() -> dict:
+    return await CompanyHiringAnalysisService.get_skill_demand_by_company()
+
+
+async def get_category_hiring_trends() -> dict:
+    return await CompanyHiringAnalysisService.get_hiring_trends_by_category()
+
