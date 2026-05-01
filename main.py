@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,6 +12,7 @@ from src.views.api.scraper_routes import router as scraper_router
 from src.views.api.jobs_routes import router as jobs_router
 from src.views.api.insights_routes import router as insights_router
 from src.views.api.studyplan_routes import router as studyplan_router
+from src.views.api.ml_routes import router as ml_router
 
 FRONTEND_DIR = Path(__file__).parent / "src" / "views" / "frontend" / "dist"
 
@@ -42,6 +43,25 @@ app.include_router(scraper_router)
 app.include_router(jobs_router)
 app.include_router(insights_router)
 app.include_router(studyplan_router)
+app.include_router(ml_router)
+
+
+@app.get("/", tags=["Health"])
+async def root():
+    if FRONTEND_DIR.exists():
+        return RedirectResponse(url="/dashboard")
+
+    return {
+        "status": "ok",
+        "message": "Backend is running. Start the frontend dev server or build the frontend to enable the UI.",
+        "routes": {
+            "health": "/health",
+            "docs": "/docs",
+            "jobs": "/api",
+            "insights": "/api/insights/dashboard",
+            "study_plan": "/api/studyplan",
+        },
+    }
 
 
 @app.get("/", tags=["Health"])
@@ -72,6 +92,9 @@ if FRONTEND_DIR.exists():
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        # Don't serve frontend for API routes
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
         file_path = FRONTEND_DIR / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))

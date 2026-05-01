@@ -1,3 +1,5 @@
+import asyncio
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import IndexModel, ASCENDING, DESCENDING
 
@@ -19,9 +21,30 @@ async def connect_db() -> None:
     """
     global _client, _db
     settings = get_settings()
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
-    _db = _client[settings.mongodb_db_name]
-    await _create_indexes()
+    last_error: Exception | None = None
+
+    for attempt in range(1, 7):
+        try:
+            _client = AsyncIOMotorClient(
+                settings.mongodb_uri,
+                serverSelectionTimeoutMS=5_000,
+            )
+            await _client.admin.command("ping")
+            _db = _client[settings.mongodb_db_name]
+            await _create_indexes()
+            return
+        except Exception as exc:
+            last_error = exc
+            if _client is not None:
+                _client.close()
+            _client = None
+            _db = None
+            if attempt == 6:
+                break
+            await asyncio.sleep(min(attempt * 2, 10))
+
+    assert last_error is not None
+    raise last_error
 
 
 async def close_db() -> None:
