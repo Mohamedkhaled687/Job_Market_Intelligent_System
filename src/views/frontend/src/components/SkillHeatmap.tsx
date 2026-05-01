@@ -158,13 +158,13 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
                 stroke="#d1d5db"
                 strokeWidth="0.5"
               />
-              {value > 0 && cellSize > 30 && (
+              {value > 0 && cellSize > 15 && (
                 <text
                   x={leftPadding + j * cellSize + cellSize / 2}
                   y={topPadding + i * cellSize + cellSize / 2 + 3}
                   textAnchor="middle"
                   className="text-xs font-semibold fill-gray-700"
-                  style={{ fontSize: '10px' }}
+                  style={{ fontSize: cellSize < 25 ? '8px' : '10px' }}
                 >
                   {value}
                 </text>
