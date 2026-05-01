@@ -20,8 +20,9 @@ import {
  */
 export const ClusteringAnalysisPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [minFrequency, setMinFrequency] = useState(2);
 
-  const skillClustering = useSkillClustering(5, selectedCategory);
+  const skillClustering = useSkillClustering(minFrequency, selectedCategory);
   const companyPatterns = useCompanyHiringPatterns();
   const categoryTrends = useCategoryHiringTrends();
 
@@ -85,6 +86,25 @@ export const ClusteringAnalysisPage: React.FC = () => {
               </select>
             </div>
 
+            {/* Frequency Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Min. Skill Frequency
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={minFrequency}
+                onChange={(e) => setMinFrequency(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>1</span>
+                <span>Current: {minFrequency}</span>
+                <span>10</span>
+              </div>
+            </div>
           </div>
         </div>
 
