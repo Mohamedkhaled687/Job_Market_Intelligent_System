@@ -64,6 +64,7 @@ export function FilterBar() {
           <option value="">All Categories</option>
           <option value="backend">Backend</option>
           <option value="frontend">Frontend</option>
+          <option value="cybersecurity">Cybersecurity</option>
           <option value="ai">AI</option>
           <option value="fullstack">Full Stack</option>
           <option value="data">Data</option>

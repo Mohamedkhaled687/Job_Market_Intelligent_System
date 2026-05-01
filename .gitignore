@@ -44,3 +44,6 @@ review_notes.md
 ### Report artifacts (keep compiled PDF)
 report/*
 !report/report.pdf
+
+# Data files 
+data/*

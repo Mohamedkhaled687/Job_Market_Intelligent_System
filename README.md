@@ -10,4 +10,3 @@ This is a job market intelligent system that uses AI to analyze the job market a
 - Job market insights
 - Job market trends
 - Job market predictions
-- Job market recommendations
