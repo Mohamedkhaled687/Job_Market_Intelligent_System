@@ -72,6 +72,7 @@ export function FilterBar() {
           <option value="design">Design</option>
           <option value="management">Management</option>
           <option value="qa">QA</option>
+          <option value="cybersecurity">Cybersecurity</option>
           <option value="other">Other</option>
         </select>
       </div>

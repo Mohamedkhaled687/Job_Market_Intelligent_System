@@ -20,7 +20,7 @@ extract a JSON object with these fields:
   "seniority": "junior|mid|senior|lead",
   "certifications": ["cert1"],
   "salary_estimate_usd": <number>,
-  "category": "backend|frontend|fullstack|ai|data|devops|mobile|design|management|qa|other"
+  "category": "backend|frontend|fullstack|ai|data|devops|mobile|design|management|qa|cybersecurity|other"
 }
 
 Rules:
@@ -233,6 +233,7 @@ def _fallback_extraction(description: str, title: str = "", location: str = "") 
         "design": ["ui/ux", "ux designer", "ui designer", "product designer"],
         "management": ["project manager", "product manager", "engineering manager", "tech lead", "team lead"],
         "qa": ["qa", "quality assurance", "test engineer", "sdet"],
+        "cybersecurity": ["cybersecurity", "security analyst", "pentester", "ethical hacker", "soc analyst", "infosec"],
     }
     for cat, keywords_list in category_map.items():
         if any(k in text for k in keywords_list):

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3, Briefcase, Home, GitCompare, Sun, Moon, Monitor,
-  DollarSign, Menu, X,
+  DollarSign, Menu, X, Zap,
 } from "lucide-react";
 import { useThemeStore } from "@/store/themeStore";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Home", icon: Home },
   { to: "/jobs", label: "Jobs", icon: Briefcase },
   { to: "/dashboard", label: "Analytics", icon: BarChart3 },
+  { to: "/insights/clustering", label: "Clustering", icon: Zap },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/salary", label: "Salary", icon: DollarSign },
 ];
