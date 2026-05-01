@@ -4,9 +4,12 @@ from typing import Optional
 from src.models.database import get_db
 
 
+
+
 async def get_dashboard(
     category: Optional[str] = None,
     seniority: Optional[str] = None,
+    position: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> dict:
@@ -14,9 +17,11 @@ async def get_dashboard(
     db = get_db()
     match_stage: dict = {}
     if category:
-        match_stage["category"] = category
+        match_stage["category"] = {"$regex": f"^{category}$", "$options": "i"}
     if seniority:
-        match_stage["seniority"] = seniority
+        match_stage["seniority"] = {"$regex": f"^{seniority}$", "$options": "i"}
+    if position:
+        match_stage["job_title"] = {"$regex": position, "$options": "i"}
 
     total_jobs = await db.jobs.count_documents(match_stage)
 
@@ -28,7 +33,8 @@ async def get_dashboard(
         {"$limit": 20},
         {"$project": {"skill": "$_id", "count": 1, "_id": 0}},
     ]
-    top_skills = await db.jobs.aggregate(top_skills_pipeline).to_list(length=20)
+    top_skills_raw = await db.jobs.aggregate(top_skills_pipeline).to_list(length=100)
+    top_skills = top_skills_raw[:20]
 
     listed_skills_pipeline = [
         {"$match": match_stage} if match_stage else {"$match": {}},
@@ -57,9 +63,19 @@ async def get_dashboard(
 
     category_pipeline = [
         {"$match": {"category": {"$ne": None}}},
-        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$group": {
+            "_id": "$category", 
+            "count": {"$sum": 1},
+            "avg_salary": {"$avg": "$salary_estimate"}
+        }},
+        {"$match": {"count": {"$gte": 5}}},  # Only categories with 5+ jobs
         {"$sort": {"count": -1}},
-        {"$project": {"category": "$_id", "count": 1, "_id": 0}},
+        {"$project": {
+            "category": "$_id", 
+            "count": 1, 
+            "avg_salary": {"$round": ["$avg_salary", 0]},
+            "_id": 0
+        }},
     ]
     category_dist = await db.jobs.aggregate(category_pipeline).to_list(length=20)
 
@@ -137,7 +153,10 @@ async def get_skill_graph(min_weight: int = 3) -> dict:
             for b in skills[i + 1:]:
                 edge_counts[(a, b)] += 1
 
-    nodes = [{"id": skill, "count": count} for skill, count in node_counts.most_common(50)]
+    nodes = [
+        {"id": skill, "count": count} 
+        for skill, count in node_counts.most_common(50)
+    ]
     node_ids = {n["id"] for n in nodes}
 
     edges = [
@@ -194,6 +213,7 @@ async def get_salary_intelligence(
     category: Optional[str] = None,
     seniority: Optional[str] = None,
     location: Optional[str] = None,
+    position: Optional[str] = None,
 ) -> dict:
     """Salary distribution with percentiles and category-aware role comparisons."""
     db = get_db()
@@ -204,6 +224,8 @@ async def get_salary_intelligence(
         match["category"] = category
     if seniority:
         match["seniority"] = seniority
+    if position:
+        match["job_title"] = {"$regex": position, "$options": "i"}
 
     pipeline = [
         {"$match": match},

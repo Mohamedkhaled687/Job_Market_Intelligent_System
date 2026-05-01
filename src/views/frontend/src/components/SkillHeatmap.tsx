@@ -54,7 +54,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
     return '#15803d';
   };
 
-  const topPadding = 120;
+  const topPadding = 150; // Increased from 120
   const leftPadding = 200;
 
   if (!displaySkills.length || !displayHeatmap.length) {
@@ -93,14 +93,42 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
           Skill Combinations Matrix
         </text>
 
-        {/* Y-axis labels (skills) */}
+        {/* Heatmap cells - Rendered first so they are behind labels */}
+        {displayHeatmap.map((row, i) =>
+          row.map((value, j) => (
+            <g key={`cell-${i}-${j}`}>
+              <rect
+                x={leftPadding + j * cellSize}
+                y={topPadding + i * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill={getColor(value)}
+                stroke="#d1d5db"
+                strokeWidth="0.5"
+              />
+              {value > 0 && cellSize > 18 && (
+                <text
+                  x={leftPadding + j * cellSize + cellSize / 2}
+                  y={topPadding + i * cellSize + cellSize / 2 + 3}
+                  textAnchor="middle"
+                  className="text-xs font-bold fill-gray-800"
+                  style={{ fontSize: cellSize < 25 ? '8px' : '10px', pointerEvents: 'none' }}
+                >
+                  {value}
+                </text>
+              )}
+            </g>
+          ))
+        )}
+
+        {/* Y-axis labels (skills) - Rendered after cells to stay on top */}
         {displaySkills.map((skill, i) => (
           <g key={`y-${i}`}>
             <text
               x={leftPadding - 10}
               y={topPadding + i * cellSize + cellSize / 2 + 4}
               textAnchor="end"
-              className="text-xs fill-gray-600"
+              className="text-xs fill-gray-600 hover:fill-blue-600 transition-colors font-medium"
               style={{ fontSize: '11px' }}
             >
               {skill}
@@ -117,18 +145,18 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
           </g>
         ))}
 
-        {/* X-axis labels (skills) */}
+        {/* X-axis labels (skills) - Rendered after cells to stay on top */}
         {displaySkills.map((skill, i) => (
           <g key={`x-${i}`}>
             <text
               x={leftPadding + i * cellSize + cellSize / 2}
-              y={topPadding - 10}
-              textAnchor="middle"
-              className="text-xs fill-gray-600"
+              y={topPadding - 15} // Increased offset from -10
+              textAnchor="start" // Changed from middle for better rotation alignment
+              className="text-xs fill-gray-600 hover:fill-blue-600 transition-colors font-medium"
               style={{
                 fontSize: '11px',
                 transform: `rotate(-45deg)`,
-                transformOrigin: `${leftPadding + i * cellSize + cellSize / 2}px ${topPadding - 10}px`,
+                transformOrigin: `${leftPadding + i * cellSize + cellSize / 2}px ${topPadding - 15}px`,
               }}
             >
               {skill}
@@ -144,34 +172,6 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
             />
           </g>
         ))}
-
-        {/* Heatmap cells */}
-        {displayHeatmap.map((row, i) =>
-          row.map((value, j) => (
-            <g key={`cell-${i}-${j}`}>
-              <rect
-                x={leftPadding + j * cellSize}
-                y={topPadding + i * cellSize}
-                width={cellSize}
-                height={cellSize}
-                fill={getColor(value)}
-                stroke="#d1d5db"
-                strokeWidth="0.5"
-              />
-              {value > 0 && cellSize > 30 && (
-                <text
-                  x={leftPadding + j * cellSize + cellSize / 2}
-                  y={topPadding + i * cellSize + cellSize / 2 + 3}
-                  textAnchor="middle"
-                  className="text-xs font-semibold fill-gray-700"
-                  style={{ fontSize: '10px' }}
-                >
-                  {value}
-                </text>
-              )}
-            </g>
-          ))
-        )}
       </svg>
 
       {/* Legend */}

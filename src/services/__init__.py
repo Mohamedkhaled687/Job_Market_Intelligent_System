@@ -1,5 +1,4 @@
 from .clustering_service import SkillClusteringService, CompanyHiringAnalysisService
 from .analysis_service import SalaryRegressionService, JobClassificationService
-from .nlp_service import NLPService
 from .wuzzuf_scraper import scrape_wuzzuf_sync
 from .Ai_Enrich_Service import extract_job_insights

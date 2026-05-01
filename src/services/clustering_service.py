@@ -16,6 +16,8 @@ from src.models.database import get_db
 logger = logging.getLogger(__name__)
 
 
+
+
 class SkillClusteringService:
     """Cluster jobs by required skills using co-occurrence patterns"""
 
@@ -49,9 +51,9 @@ class SkillClusteringService:
         # Build match stage for filtering
         match_stage = {}
         if category:
-            match_stage["category"] = category
+            match_stage["category"] = {"$regex": f"^{category}$", "$options": "i"}
         if seniority:
-            match_stage["seniority"] = seniority
+            match_stage["seniority"] = {"$regex": f"^{seniority}$", "$options": "i"}
 
         # Get all jobs with their skills
         pipeline = [
@@ -92,9 +94,10 @@ class SkillClusteringService:
         skill_counts = Counter(all_skills)
         top_skills = [
             skill
-            for skill, count in skill_counts.most_common(30)
+            for skill, count in skill_counts.most_common(50)
             if count >= min_skill_frequency
         ]
+        top_skills = top_skills[:30] # Keep top 30 after filtering
 
         if not top_skills:
             return {
@@ -103,7 +106,7 @@ class SkillClusteringService:
                 "clusters": [],
                 "job_count": len(jobs),
                 "unique_skill_count": 0,
-                "message": f"Not enough skills to cluster (minimum {min_skill_frequency} occurrences required)"
+                "message": f"Not enough data to cluster (minimum {min_skill_frequency} occurrences required for each skill)"
             }
 
         # Build co-occurrence matrix (skill-to-skill relationships)
@@ -173,68 +176,6 @@ class SkillClusteringService:
         clusters.sort(key=lambda x: x["strength"], reverse=True)
         return clusters[:10]  # Return top 10 clusters
 
-    @staticmethod
-    async def cluster_jobs_kmeans(k: int = 5) -> Dict:
-        """
-        K-Means Clustering implementation as per Lecture 4.
-        1. Pick K value.
-        2. Pick random K points as initial centroids.
-        3. Calculate nearest centroid (Euclidean distance).
-        4. Re-assign centroids.
-        5. Repeat until convergence.
-        6. Calculate WSS (Within-Cluster Sum of Squares).
-        """
-        db = get_db()
-        jobs = await db.jobs.find({}, {"normalized_skills": 1, "job_title": 1, "company": 1}).to_list(length=1000)
-        
-        if not jobs:
-            return {"error": "No jobs found"}
-
-        # Prepare data: skills as text
-        job_texts = [" ".join(job.get("normalized_skills", [])) for job in jobs]
-        
-        # Vectorize
-        vectorizer = TfidfVectorizer(max_features=100)
-        X = vectorizer.fit_transform(job_texts).toarray()
-
-        # Apply K-Means
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        kmeans.fit(X)
-        
-        # WSS (Inertia in sklearn)
-        wss = kmeans.inertia_
-
-        # Group jobs by cluster
-        clusters = defaultdict(list)
-        for idx, label in enumerate(kmeans.labels_):
-            clusters[int(label)].append({
-                "title": jobs[idx].get("job_title"),
-                "company": jobs[idx].get("company"),
-                "skills": jobs[idx].get("normalized_skills")
-            })
-
-        # Get top skills per cluster
-        cluster_summaries = []
-        for i in range(k):
-            cluster_jobs = clusters[i]
-            all_cluster_skills = []
-            for j in cluster_jobs:
-                all_cluster_skills.extend(j["skills"] or [])
-            
-            top_skills = Counter(all_cluster_skills).most_common(5)
-            cluster_summaries.append({
-                "cluster_id": i,
-                "count": len(cluster_jobs),
-                "top_skills": [s[0] for s in top_skills],
-                "sample_jobs": cluster_jobs[:3]
-            })
-
-        return {
-            "k": k,
-            "wss": wss,
-            "clusters": cluster_summaries
-        }
-
 
 class CompanyHiringAnalysisService:
     """Analyze company hiring patterns and trends"""
@@ -300,6 +241,7 @@ class CompanyHiringAnalysisService:
                 "categories": [
                     {"category": cat, "count": count}
                     for cat, count in category_dist
+                    if count >= 5
                 ],
                 "seniority_distribution": [
                     {"level": level, "count": count}

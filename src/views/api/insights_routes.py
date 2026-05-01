@@ -15,12 +15,14 @@ router = APIRouter(prefix="/api/insights", tags=["Insights"])
 async def dashboard(
     category: Optional[str] = None,
     seniority: Optional[str] = None,
+    position: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ):
     return await analytics_controller.get_dashboard(
         category=category,
         seniority=seniority,
+        position=position,
         date_from=date_from,
         date_to=date_to,
     )
@@ -36,9 +38,13 @@ async def salary_intelligence(
     category: Optional[str] = None,
     seniority: Optional[str] = None,
     location: Optional[str] = None,
+    position: Optional[str] = None,
 ):
     return await analytics_controller.get_salary_intelligence(
-        category=category, seniority=seniority, location=location,
+        category=category, 
+        seniority=seniority, 
+        location=location,
+        position=position,
     )
 
 
