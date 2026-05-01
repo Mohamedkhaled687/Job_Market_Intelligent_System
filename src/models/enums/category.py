@@ -12,4 +12,5 @@ class JobCategory(str, Enum):
     DESIGN = "design"
     MANAGEMENT = "management"
     QA = "qa"
+    CYBERSECURITY = "cybersecurity"
     OTHER = "other"

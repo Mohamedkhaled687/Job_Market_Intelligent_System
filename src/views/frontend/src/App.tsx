@@ -8,6 +8,7 @@ import { JobDetailPage } from "@/pages/JobDetailPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ComparePage } from "@/pages/ComparePage";
 import { SalaryIntelPage } from "@/pages/SalaryIntelPage";
+import { ClusteringAnalysisPage } from "@/pages/ClusteringAnalysisPage";
 import { StudyPlanChat } from "@/components/StudyPlanChat";
 
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/compare" element={<ComparePage />} />
               <Route path="/salary" element={<SalaryIntelPage />} />
+              <Route path="/insights/clustering" element={<ClusteringAnalysisPage />} />
             </Routes>
           </main>
         </div>

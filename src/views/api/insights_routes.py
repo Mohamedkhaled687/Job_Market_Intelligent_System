@@ -36,3 +36,32 @@ async def salary_intelligence(
     return await analytics_controller.get_salary_intelligence(
         category=category, seniority=seniority, location=location,
     )
+
+
+@router.get("/skill-clustering")
+async def skill_clustering(
+    min_skill_frequency: int = Query(5, ge=1),
+    category: Optional[str] = None,
+    seniority: Optional[str] = None,
+):
+    return await analytics_controller.get_skill_clustering(
+        min_skill_frequency=min_skill_frequency,
+        category=category,
+        seniority=seniority,
+    )
+
+
+@router.get("/company-hiring-patterns")
+async def company_hiring_patterns():
+    return await analytics_controller.get_company_hiring_patterns()
+
+
+@router.get("/company-skill-matrix")
+async def company_skill_matrix():
+    return await analytics_controller.get_company_skill_matrix()
+
+
+@router.get("/category-hiring-trends")
+async def category_hiring_trends():
+    return await analytics_controller.get_category_hiring_trends()
+
