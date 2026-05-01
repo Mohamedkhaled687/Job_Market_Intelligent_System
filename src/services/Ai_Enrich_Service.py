@@ -20,7 +20,7 @@ extract a JSON object with these fields:
   "seniority": "junior|mid|senior|lead",
   "certifications": ["cert1"],
   "salary_estimate_usd": <number>,
-  "category": "backend|frontend|fullstack|ai|data|devops|mobile|design|management|qa|other"
+  "category": "backend|frontend|cybersecurity|fullstack|ai|data|devops|mobile|design|management|qa|other"
 }
 
 Rules:
@@ -56,6 +56,7 @@ _MARKET_RATES_USD: dict[str, dict[str, int]] = {
 
 _CATEGORY_MULTIPLIER: dict[str, float] = {
     "ai": 1.25, "data": 1.20, "devops": 1.15, "fullstack": 1.10, "backend": 1.05,
+    "cybersecurity": 1.20,
     "frontend": 1.00, "mobile": 1.05, "management": 1.15,
     "design": 0.90, "qa": 0.90, "other": 1.00,
 }
@@ -205,6 +206,15 @@ def _fallback_extraction(description: str, title: str = "", location: str = "") 
         "kafka": "Kafka", "rabbitmq": "RabbitMQ",
         "elasticsearch": "Elasticsearch", "nginx": "Nginx",
         "agile": "Agile", "scrum": "Scrum", "jira": "Jira",
+        "cybersecurity": "Cybersecurity", "cyber security": "Cybersecurity",
+        "siem": "SIEM", "soc analyst": "SOC", "security operations center": "SOC",
+        "splunk": "Splunk", "wazuh": "Wazuh",
+        "penetration testing": "Penetration Testing", "pentest": "Penetration Testing",
+        "ethical hacking": "Ethical Hacking", "incident response": "Incident Response",
+        "threat hunting": "Threat Hunting", "threat intelligence": "Threat Intelligence",
+        "vulnerability management": "Vulnerability Management",
+        "application security": "Application Security", "appsec": "Application Security",
+        "cloud security": "Cloud Security", "owasp": "OWASP",
     }
     found_skills = []
     for keyword, canonical in skill_keywords.items():
@@ -221,6 +231,15 @@ def _fallback_extraction(description: str, title: str = "", location: str = "") 
 
     category = "other"
     category_map = {
+        "cybersecurity": [
+            "cybersecurity", "cyber security", "information security", "security engineer",
+            "security analyst", "soc analyst", "security operations center",
+            "siem engineer", "siem administrator", "siem platform",
+            "blue team", "red team", "incident response", "penetration testing",
+            "penetration tester", "ethical hacker", "application security", "appsec",
+            "cloud security", "threat intelligence", "threat hunting",
+            "vulnerability management",
+        ],
         "ai": ["ai engineer", "machine learning engineer", "ml engineer",
                "deep learning", "nlp", "computer vision", "generative ai", "llm"],
         "data": ["data engineer", "data scientist", "data analyst",
