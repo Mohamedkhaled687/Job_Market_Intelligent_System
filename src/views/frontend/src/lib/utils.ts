@@ -23,6 +23,7 @@ export function formatRelativeDate(dateStr: string | null | undefined): string {
 export const CATEGORY_COLORS: Record<string, string> = {
   backend: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   frontend: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  cybersecurity: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   fullstack: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   data: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   devops: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
