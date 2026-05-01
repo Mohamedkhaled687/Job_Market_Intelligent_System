@@ -176,7 +176,13 @@ class SkillClusteringService:
     @staticmethod
     async def cluster_jobs_kmeans(k: int = 5) -> Dict:
         """
-        Group jobs into clusters using the K-Means algorithm.
+        K-Means Clustering implementation as per Lecture 4.
+        1. Pick K value.
+        2. Pick random K points as initial centroids.
+        3. Calculate nearest centroid (Euclidean distance).
+        4. Re-assign centroids.
+        5. Repeat until convergence.
+        6. Calculate WSS (Within-Cluster Sum of Squares).
         """
         db = get_db()
         jobs = await db.jobs.find({}, {"normalized_skills": 1, "job_title": 1, "company": 1}).to_list(length=1000)
