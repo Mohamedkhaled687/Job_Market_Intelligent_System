@@ -9,7 +9,7 @@ from collections import defaultdict, Counter
 try:
     from sklearn.cluster import KMeans
     from sklearn.feature_extraction.text import TfidfVectorizer
-except ModuleNotFoundError:  # pragma: no cover - environment-dependent
+except ModuleNotFoundError: 
     KMeans = None
     TfidfVectorizer = None
 from src.models.database import get_db
@@ -364,27 +364,33 @@ class CompanyHiringAnalysisService:
         )
         top_skills = [s["_id"] for s in top_skills_data]
 
-        # Build company-skill matrix
-        heatmap_data = []
-
-        for company in company_names:
-            row = []
-            for skill in top_skills:
-                # Count jobs in this company that require this skill
-                count = await db.jobs.count_documents(
-                    {
-                        "company": company,
-                        "normalized_skills": skill,
-                    }
-                )
-                row.append(count)
-
-            heatmap_data.append(
-                {
-                    "company": company,
-                    "skill_counts": row,
+        # Build company-skill matrix with a single aggregation query
+        # instead of N x M individual count_documents calls.
+        pair_counts_pipeline = [
+            {"$match": {"company": {"$in": company_names}}},
+            {"$unwind": "$normalized_skills"},
+            {"$match": {"normalized_skills": {"$in": top_skills}}},
+            {
+                "$group": {
+                    "_id": {
+                        "company": "$company",
+                        "skill": "$normalized_skills",
+                    },
+                    "count": {"$sum": 1},
                 }
-            )
+            },
+        ]
+        pair_counts = await db.jobs.aggregate(pair_counts_pipeline).to_list(length=None)
+
+        counts_map: dict[tuple[str, str], int] = {}
+        for row in pair_counts:
+            key = (row["_id"]["company"], row["_id"]["skill"])
+            counts_map[key] = row["count"]
+
+        heatmap_data = []
+        for company in company_names:
+            skill_counts = [counts_map.get((company, skill), 0) for skill in top_skills]
+            heatmap_data.append({"company": company, "skill_counts": skill_counts})
 
         return {
             "companies": company_names,

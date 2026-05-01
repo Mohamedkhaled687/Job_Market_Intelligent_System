@@ -57,6 +57,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
 
   const topPadding = 120;
   const leftPadding = 200;
+  const gridSize = displaySkills.length * cellSize;
 
   if (!displaySkills.length || !displayHeatmap.length) {
     return (
@@ -79,10 +80,10 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
         Shows skill co-occurrence frequency (darker = more frequently required together)
       </p>
       <div className="w-full overflow-x-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))/0.35] p-3">
-      <svg width={width + leftPadding} height={height + topPadding}>
+      <svg width={leftPadding + gridSize + 12} height={topPadding + gridSize + 12}>
         {/* Title */}
         <text
-          x={(width + leftPadding) / 2}
+          x={(leftPadding + gridSize) / 2}
           y={30}
           textAnchor="middle"
           className="text-sm font-semibold fill-[hsl(var(--foreground))]"
@@ -106,7 +107,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
             <line
               x1={leftPadding}
               y1={topPadding + i * cellSize}
-              x2={leftPadding + width - leftPadding}
+              x2={leftPadding + gridSize}
               y2={topPadding + i * cellSize}
               stroke="hsl(var(--border))"
               strokeWidth="1"
@@ -135,7 +136,7 @@ export const SkillHeatmap: React.FC<SkillHeatmapProps> = ({
               x1={leftPadding + i * cellSize}
               y1={topPadding}
               x2={leftPadding + i * cellSize}
-              y2={topPadding + height - topPadding}
+              y2={topPadding + gridSize}
               stroke="hsl(var(--border))"
               strokeWidth="1"
             />
