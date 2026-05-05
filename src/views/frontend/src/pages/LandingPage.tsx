@@ -87,7 +87,7 @@ export function LandingPage() {
             <KPICard title="Total Jobs" value={data.total_jobs} icon={Briefcase} />
             <KPICard title="Top Skill Demand" value={data.top_skills[0]?.count || 0} suffix={` (${data.top_skills[0]?.skill || "N/A"})`} icon={TrendingUp} />
             <KPICard title="Avg Salary" value={data.salary_stats.avg_salary} prefix="$" icon={DollarSign} />
-            <KPICard title="Companies Hiring" value={data.top_companies.length} icon={Building2} />
+            <KPICard title="Companies Hiring" value={data.companies_hiring} icon={Building2} />
           </div>
         ) : null}
       </section>

@@ -81,6 +81,19 @@ async def get_dashboard(
     ]
     top_companies = await db.jobs.aggregate(top_companies_pipeline).to_list(length=10)
 
+    companies_hiring_pipeline = [
+        {"$match": match_stage} if match_stage else {"$match": {}},
+        {"$match": {"company": {"$exists": True, "$nin": [None, ""]}}},
+        {"$group": {"_id": "$company"}},
+        {"$count": "count"},
+    ]
+    companies_hiring_rows = await db.jobs.aggregate(companies_hiring_pipeline).to_list(
+        length=1
+    )
+    companies_hiring = (
+        int(companies_hiring_rows[0]["count"]) if companies_hiring_rows else 0
+    )
+
     trends_pipeline = [
         {"$match": {"posted_date": {"$ne": None}}},
         {"$group": {
@@ -103,6 +116,7 @@ async def get_dashboard(
         "category_distribution": category_dist,
         "seniority_distribution": seniority_dist,
         "top_companies": top_companies,
+        "companies_hiring": companies_hiring,
         "monthly_trends": monthly_trends,
     }
 

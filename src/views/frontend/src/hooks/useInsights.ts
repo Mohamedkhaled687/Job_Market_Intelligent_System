@@ -8,6 +8,8 @@ export interface DashboardData {
   category_distribution: { category: string; count: number }[];
   seniority_distribution: { seniority: string; count: number }[];
   top_companies: { company: string; count: number }[];
+  /** Distinct non-empty company names in the current filter (not capped at 10). */
+  companies_hiring: number;
   monthly_trends: { month: string; count: number }[];
 }
 
