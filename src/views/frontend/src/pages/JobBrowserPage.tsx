@@ -64,7 +64,7 @@ export function JobBrowserPage() {
         <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-12 text-center">
           <p className="text-lg font-medium text-[hsl(var(--muted-foreground))]">No jobs found</p>
           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
-            Try adjusting your filters or trigger a new scrape.
+            Try adjusting your filters.
           </p>
         </div>
       )}
